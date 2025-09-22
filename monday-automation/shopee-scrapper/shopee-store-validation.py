@@ -175,7 +175,6 @@ def write_to_gsheet(client, df, sheet_name, worksheet_name):
             ] + df_to_write.values.tolist()
         )
         log("success", f"Successfully wrote {len(df)} rows to the sheet.")
-        # Additional formatting can be added here if needed
     except Exception as e:
         log("error",
             f"An error occurred while writing to the Google Sheet: {e}")
@@ -263,10 +262,10 @@ def perform_validation(portal_data, tasks_to_validate):
             'Actual Name': actual_name,
             'Name Result': name_result,
             'Name Status(Blank)': "",
-            'Actual Outlet Name': actual_name
+            'Actual Outlet Name': actual_name,
             'Address Result': "",
             'Address Status(Blank)': "",
-            'Actual Address': portal_record.get('address', '') if portal_record else "",
+            'Actual Address': portal_record.get('address', '') if portal_record else ""
         })
 
     log("success", "Validation complete.")

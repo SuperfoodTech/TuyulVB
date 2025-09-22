@@ -239,7 +239,6 @@ def collect_all_merchants(driver):
     del driver.requests
 
     try:
-        # --- STEP 1: First, try to capture the MAIN (multi-outlet) API ---
         log("info", "Attempting to capture the main multi-outlet API (timeout: 20s)...")
         request = driver.wait_for_request(TARGET_API_URL, timeout=20)
 
@@ -394,7 +393,6 @@ if __name__ == "__main__":
                             ]
                         ].copy()
 
-                        # Add the new 'Portal' column at the beginning
                         output_df.insert(0, 'Portal', account_name)
 
                         output_df.rename(columns={
@@ -407,7 +405,6 @@ if __name__ == "__main__":
                         if run_all_mode:
                             all_accounts_data.append(output_df)
                         else:
-                            # If it's a single run, write it immediately
                             worksheet_name = f"E-{account_name}"
                             write_to_gsheet(gsheet_client, output_df,
                                             GOOGLE_SHEET_NAME, worksheet_name)
@@ -418,7 +415,6 @@ if __name__ == "__main__":
                 log("fatal",
                     f"An unexpected error occurred for '{account_name}': {e}")
 
-        # After the loop, if in "Run All" mode, combine and write the data
         if run_all_mode and all_accounts_data:
             log("info", "Combining data from all accounts...")
             final_df = pd.concat(all_accounts_data, ignore_index=True)

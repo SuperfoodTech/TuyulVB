@@ -424,7 +424,6 @@ def collect_all_merchants(driver):
     except TimeoutException:
         log("info", "Main API not found. Checking for the single-outlet portal API (timeout: 20s)...")
 
-        # --- STEP 2: Try to capture the PORTAL (single-outlet) API ---
         try:
             request = driver.wait_for_request(
                 SINGLE_OUTLET_CHECK_URL, timeout=20)
@@ -565,7 +564,6 @@ if __name__ == "__main__":
         print("\n" + "=" * 70)
         log("info", "Please select an option:")
 
-        # --- Modified Menu with "Run All" option ---
         print("   1. Run All Accounts")
         for i, name in enumerate(account_list):
             print(f"   {i+2}. {name}")
@@ -580,7 +578,6 @@ if __name__ == "__main__":
             continue
 
         accounts_to_process = []
-        # --- Modified choice handling ---
         if choice == 1:
             log("info", "Option selected: Run All Accounts.")
             accounts_to_process = account_list
@@ -595,7 +592,6 @@ if __name__ == "__main__":
             log("error", f"Invalid choice '{choice_input}'. Please try again.")
             continue
 
-        # --- Consolidated processing loop ---
         for account_name in accounts_to_process:
             print("-" * 70)
             log("info",

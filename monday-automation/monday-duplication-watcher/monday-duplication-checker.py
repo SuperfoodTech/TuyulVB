@@ -27,7 +27,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 POLL_INTERVAL_SECONDS = 600
-STATE_FILE = "monday_state.json"  # File to store the board state
+STATE_FILE = "monday_state.json"
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -74,7 +74,7 @@ def execute_monday_query(query, variables=None, max_retries=3, initial_wait=2):
                 logging.warning(
                     f"Complexity budget exhausted. Retrying in {wait_time} seconds... (Attempt {retries}/{max_retries})")
                 time.sleep(wait_time)
-                wait_time *= 2  # Double the wait time for the next potential failure
+                wait_time *= 2
             else:
                 error_content = e.response.text if e.response else "N/A"
                 logging.error(
@@ -84,7 +84,7 @@ def execute_monday_query(query, variables=None, max_retries=3, initial_wait=2):
             logging.error(f"A network error occurred: {e}")
             return None
 
-    return None  # Return None if all retries fail
+    return None
 
 
 def get_board_structure(board_id):
@@ -139,7 +139,6 @@ def update_statuses_in_bulk(updates: dict, board_id: int, column_id: str, column
     """Updates item statuses in batches to avoid the API's token limit."""
     if not updates:
         return
-    # MODIFIED: Reduced batch size to prevent complexity errors
     BATCH_SIZE = 50
     all_updates = list(updates.items())
     total_updates = len(all_updates)
