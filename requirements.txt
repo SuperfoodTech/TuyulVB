@@ -1,0 +1,12 @@
+requests
+selenium-wire
+webdriver-manager
+pandas
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+tqdm
+python-dotenv
+pytest
+pytest-mock
