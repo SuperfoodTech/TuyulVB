@@ -1,7 +1,6 @@
 # credentials.py
 # --- SENSITIVE ---
 # This file contains account credentials.
-# DO NOT commit this file to version control. Add it to your .gitignore file.
 
 ACCOUNT_CREDS = {
     "F1": {

@@ -12,12 +12,14 @@ def monday_client():
     return client
 
 
+@pytest.mark.unit
 def test_monday_client_initialization_success():
     with patch.dict('os.environ', {'MONDAY_API_KEY': 'test_key'}):
         client = MondayClient()
         assert client.api_key == 'test_key'
 
 
+@pytest.mark.unit
 def test_monday_client_initialization_no_key():
     with patch.dict('os.environ', {}, clear=True):
         with pytest.raises(ConfigurationError, match='MONDAY_API_KEY not provided'):
@@ -25,6 +27,7 @@ def test_monday_client_initialization_no_key():
 
 
 @patch('requests.post')
+@pytest.mark.unit
 def test_run_query_success(mock_post, monday_client):
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -37,6 +40,7 @@ def test_run_query_success(mock_post, monday_client):
 
 
 @patch('requests.post')
+@pytest.mark.unit
 def test_run_query_graphql_error(mock_post, monday_client):
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -49,6 +53,7 @@ def test_run_query_graphql_error(mock_post, monday_client):
 
 
 @patch('requests.post')
+@pytest.mark.unit
 def test_run_query_authentication_error(mock_post, monday_client):
     mock_response = MagicMock()
     mock_response.status_code = 401
@@ -62,6 +67,7 @@ def test_run_query_authentication_error(mock_post, monday_client):
 
 @patch('requests.post')
 @patch('time.sleep', return_value=None)
+@pytest.mark.unit
 def test_run_query_rate_limit_retry_success(mock_sleep, mock_post, monday_client):
     # First call: rate limit error
     rate_limit_response = MagicMock()
@@ -86,6 +92,7 @@ def test_run_query_rate_limit_retry_success(mock_sleep, mock_post, monday_client
 
 @patch('requests.post')
 @patch('time.sleep', return_value=None)
+@pytest.mark.unit
 def test_run_query_rate_limit_max_retries_fails(mock_sleep, mock_post, monday_client):
     rate_limit_response = MagicMock()
     rate_limit_response.status_code = 429

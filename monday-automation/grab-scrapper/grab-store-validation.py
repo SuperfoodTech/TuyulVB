@@ -12,7 +12,6 @@ log = logging.getLogger(__name__)
 
 # --- Data Collection and Validation ---
 
-
 def restructure_data(df):
     tasks = []
     log.info("🛠️ Restructuring data...")
@@ -34,10 +33,8 @@ def restructure_data(df):
     for index, row in df.iterrows():
         for mapping in COLUMN_MAPPING:
             ofd_name = row.get(mapping["ofd_name_col"])
-
             if pd.notna(ofd_name) and str(ofd_name).strip() != "":
                 store_id_raw = row.get(mapping["id_col"])
-
                 tasks.append({
                     "outlet_name": str(row.get(mapping["outlet_name"], "")).strip(),
                     "ofd_name": str(ofd_name).strip(),
@@ -229,8 +226,9 @@ if __name__ == "__main__":
                                 f"'{account_name}' is a single-outlet account. Writing 'False' report.")
                             report_df = create_single_outlet_report(
                                 tasks_for_selected_account)
-                            gsheet_client.write_dataframe_to_worksheet(report_df,
-                                                                       GOOGLE_SHEET_NAME, account_name)
+                            gsheet_client.write_dataframe_to_worksheet(
+                                report_df,
+                                GOOGLE_SHEET_NAME, account_name)
                             log.info(
                                 f"✅ Report for {account_name} saved successfully!")
 
@@ -246,8 +244,9 @@ if __name__ == "__main__":
                                 portal_df, tasks_for_selected_account)
 
                             if not report_df.empty:
-                                gsheet_client.write_dataframe_to_worksheet(report_df,
-                                                                           GOOGLE_SHEET_NAME, account_name)
+                                gsheet_client.write_dataframe_to_worksheet(
+                                    report_df,
+                                    GOOGLE_SHEET_NAME, account_name)
                                 log.info(
                                     f"✅ Report for {account_name} saved successfully!")
                             else:

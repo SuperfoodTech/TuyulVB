@@ -4,87 +4,98 @@ This file intentionally keeps implementation light. The full client should
 implement GraphQL queries, paging, rate-limit handling, and retries.
 """
 import os
-import requests
-import time
 import json
-import logging
-from typing import Any, Dict, Optional, List
-from collections import defaultdict
+import time
+import requests
+from tqdm import tqdm
+from utils.logging import log
+from services.base.exceptions import ConfigurationError, ApiError
 
-from ..base.exceptions import APIError, AuthenticationError, ConfigurationError
-from . import queries
+
+def _is_network_available():
+    try:
+        requests.get("https://1.1.1.1", timeout=5)
+        return True
+    except requests.ConnectionError:
+        return False
 
 
 class MondayClient:
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv('MONDAY_API_KEY')
+    """Client for interacting with the Monday.com GraphQL API."""
+
+    def __init__(self):
+        self.api_key = os.getenv("MONDAY_API_KEY")
+        self.api_url = "https://api.monday.com/v2"
+        self.headers = {"Authorization": self.api_key,
+                        "API-Version": "2023-07"}
         if not self.api_key:
-            raise ConfigurationError('MONDAY_API_KEY not provided')
-        self.endpoint = 'https://api.monday.com/v2'
-        self.logger = logging.getLogger(__name__)
+            raise ConfigurationError(
+                "MONDAY_API_KEY not found in environment variables.")
 
-    def _headers(self) -> Dict[str, str]:
-        return {
-            'Authorization': self.api_key,
-            'Content-Type': 'application/json'
-        }
-
-    def run_query(self, query: str, variables: Optional[Dict[str, Any]] = None, max_retries: int = 3, initial_wait: int = 2) -> Dict[str, Any]:
-        """
-        Sends a GraphQL query to the Monday.com API and handles errors,
-        with exponential backoff for rate limiting.
-        """
+    def _execute_query(self, query, variables=None):
         payload = {'query': query}
         if variables:
             payload['variables'] = variables
+        try:
+            response = requests.post(
+                self.api_url, json=payload, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            json_response = response.json()
+            if "errors" in json_response:
+                raise ApiError(
+                    f"Monday API Error: {json_response['errors'][0]['message']}")
+            return json_response
+        except requests.exceptions.RequestException as e:
+            raise ApiError(f"Monday API request failed: {e}") from e
 
-        retries = 0
-        wait_time = initial_wait
+    def get_board_columns(self, board_id):
+        query = f'query {{ boards(ids: {board_id}) {{ columns {{ id title }} }} }}'
+        response_data = self._execute_query(query)
+        return {col['title']: col['id'] for col in response_data['data']['boards'][0]['columns']}
 
-        while retries < max_retries:
-            try:
-                response = requests.post(
-                    self.endpoint, json=payload, headers=self._headers())
-                response.raise_for_status()
-                data = response.json()
-                if 'errors' in data:
-                    self.logger.error(
-                        f"GraphQL query failed with errors: {data['errors']}")
-                    if 'complexity' in str(data['errors']).lower():
-                        raise APIError(
-                            "Complexity budget exhausted")
-                return data
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 401:
-                    raise AuthenticationError(
-                        "Unauthorized: Check your Monday.com API key.")
-                if e.response.status_code == 429:
-                    retries += 1
-                    if retries >= max_retries:
-                        self.logger.error(
-                            "Max retries reached for complexity budget error. Aborting this request.")
-                        raise APIError(
-                            "Max retries reached for complexity budget error")
+    def write_items(self, merchants_list, board_id, group_id, api_type):
+        log("info",
+            f"Connecting to Monday.com board: {board_id}, group: {group_id}...")
+        try:
+            column_map = self.get_board_columns(board_id)
+        except ApiError as e:
+            log("error", f"Could not fetch board structure: {e}")
+            return
 
-                    try:
-                        error_data = e.response.json()
-                        wait_time = error_data.get("extensions", {}).get(
-                            "retry_in_seconds", wait_time)
-                    except json.JSONDecodeError:
-                        pass
+        log("info",
+            f"Starting to write {len(merchants_list)} merchants to Monday.com...")
+        for merchant in tqdm(merchants_list, desc="Uploading Merchants"):
+            item_name = merchant.get('merchantName', 'N/A')
+            column_values = {column_map.get(
+                "Store ID"): merchant.get("merchantID")}
+            if api_type == 'MULTI_OUTLET' and "Outlet Status" in column_map:
+                status_value = merchant.get("status")
+                if status_value:
+                    column_values[column_map["Outlet Status"]] = {
+                        "label": status_value}
+            column_values = {k: v for k, v in column_values.items() if k and v}
+            mutation_query = "mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) { create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues) { id } }"
+            variables = {'boardId': board_id, 'groupId': group_id,
+                         'itemName': item_name, 'columnValues': json.dumps(column_values)}
 
-                    self.logger.warning(
-                        f"Complexity budget exhausted. Retrying in {wait_time} seconds... (Attempt {retries}/{max_retries})")
-                    time.sleep(wait_time)
-                    wait_time *= 2
-                else:
-                    error_content = e.response.text if e.response else "N/A"
-                    self.logger.error(
-                        f"API Request failed: {e} - Response: {error_content}")
-                    raise APIError(f"API Request failed: {e}")
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"A network error occurred: {e}")
-                raise APIError(f"A network error occurred: {e}")
+            while True:
+                try:
+                    self._execute_query(mutation_query, variables)
+                    break
+                except ApiError as e:
+                    if not _is_network_available():
+                        log("warn", "Network is down. Pausing until restored...")
+                        while not _is_network_available():
+                            time.sleep(30)
+                        log("success", "Network restored. Retrying failed item.")
+                        continue
+                    else:
+                        log("error",
+                            f"API error for '{item_name}': {e}. Skipping.")
+                        break
+        log("success", "Finished uploading process for this group.")
+        self.logger.error(f"A network error occurred: {e}")
+        raise APIError(f"A network error occurred: {e}")
 
         raise APIError("Query failed after multiple retries.")
 
@@ -123,8 +134,9 @@ class MondayClient:
         items_data = data['data']['boards'][0]['groups'][0]['items_page']['items']
         processed_items = {}
         for item in items_data:
-            values = {cv['id']: cv['text']
-                      or "" for cv in item['column_values']}
+            values = {
+                cv['id']: cv['text']
+                or "" for cv in item['column_values']}
             values['item_name'] = item.get('name', '')
             processed_items[item['id']] = values
         return processed_items

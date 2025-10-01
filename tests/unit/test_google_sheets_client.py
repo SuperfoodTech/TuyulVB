@@ -6,6 +6,7 @@ from services.google_sheets.client import GoogleSheetsClient
 from services.base.exceptions import APIError, ConfigurationError
 
 
+@pytest.mark.unit
 @patch('services.google_sheets.client.authorize_service_account')
 def test_google_sheets_client_initialization_success(mock_authorize):
     """Test that GoogleSheetsClient initializes successfully with a mock client."""
@@ -19,6 +20,7 @@ def test_google_sheets_client_initialization_success(mock_authorize):
     mock_authorize.assert_called_once_with("dummy_creds.json")
 
 
+@pytest.mark.unit
 @patch('services.google_sheets.client.authorize_service_account', side_effect=FileNotFoundError)
 def test_google_sheets_client_initialization_file_not_found(mock_authorize):
     """Test that a ConfigurationError is raised if the credentials file is not found."""
@@ -26,6 +28,7 @@ def test_google_sheets_client_initialization_file_not_found(mock_authorize):
         GoogleSheetsClient(creds_file="non_existent.json")
 
 
+@pytest.mark.unit
 @patch('services.google_sheets.client.authorize_service_account')
 def test_read_worksheet_as_dataframe_success(mock_authorize):
     """Test reading a worksheet as a pandas DataFrame successfully."""
@@ -52,6 +55,7 @@ def test_read_worksheet_as_dataframe_success(mock_authorize):
     mock_spreadsheet.worksheet.assert_called_once_with('test_ws')
 
 
+@pytest.mark.unit
 @patch('services.google_sheets.client.authorize_service_account')
 def test_read_worksheet_not_found(mock_authorize):
     """Test that an APIError is raised when a worksheet is not found."""
@@ -67,6 +71,7 @@ def test_read_worksheet_not_found(mock_authorize):
         client.read_worksheet_as_dataframe('test_sheet', 'test_ws')
 
 
+@pytest.mark.unit
 @patch('services.google_sheets.client.authorize_service_account')
 def test_write_dataframe_to_worksheet_api_error(mock_authorize):
     """Test that an APIError is raised during a gspread API error."""

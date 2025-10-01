@@ -1,116 +1,147 @@
-# 🤖 Grab Food Data Extractor 🤖
+# 🤖 Grab Merchant Data Extractor 🤖
 
-A powerful and efficient automation tool designed to extract key data for restaurants from Grab Food and update your Google Sheets. Say goodbye to manual searching!
+An advanced automation tool to extract merchant data directly from the Grab Merchant Portal and upload it to a Monday.com board.
 
 ## ✨ What It Does
 
-This project provides a seamless pipeline to enrich your restaurant database. It automates the tedious task of finding key restaurant data from Grab Food.
+This project automates the entire lifecycle of validating and tracking store data by integrating directly with Grab's backend APIs and Monday.com.
 
 The core workflow is as follows:
 
-1.  **📖 Read Data**: The script securely connects to your Google Sheet and reads a list of restaurant names and their locations.
-2.  **🌐 Scrape Web**: For each restaurant, it launches a browser, navigates to Grab Food, and performs a search using the provided details.
-3.  **🔗 Extract Data**: Once the correct restaurant is found, it captures key information:
-    *   The internal **Grab Store ID**.
-    *   The actual **Outlet Name**
-    *   The current **Outlet Status** (e.g., Open, Closed).
-4.  **✍️ Update Sheet**: The script then populates the corresponding columns in your original Google Sheet with the extracted data. If a restaurant isn't found, it's gracefully marked as "Not Found".
-
-This automation saves countless hours of manual work, reduces human error, and keeps your data up-to-date.
+1.  **🔐 Secure Login**: The script logs into the Grab Merchant Portal using provided account credentials.
+2.  **📡 Intercept API Calls**: Instead of scraping the UI, it uses `selenium-wire` to intercept the background API calls the portal makes to fetch merchant data. This is faster and more reliable.
+3.  **📊 Extract Data**: It captures a complete list of merchants, including their `merchantID`, `merchantName`, and `status`.
+4.  **✍️ Update Monday.com**: The script connects to your Monday.com board and populates a specified group with the extracted merchant data.
 
 ## 🏗️ Project Structure
 
-The project is organized into a modular structure for clarity, maintainability, and scalability.
-
 ```
 sf-automation/
-├── 📜 README.md              # You are here!
-├── 📝 requirements.txt        # Project dependencies for pip.
-├── 🚀 extractor.py          # The main controller that orchestrates the workflow.
-├── 📊 gsheet.py             # Module for all Google Sheets interactions.
-├── 🕷️ grab_scraper.py        # Module for Selenium-based web scraping of Grab Food.
-├── 🔑 superfood-test-....json # Your Google API credentials file.
-└── 🚗 chromedriver.exe       # The Selenium WebDriver for Chrome.
+├── main.py                # Main controller and execution flow
+├── grab_scraper.py        # Handles browser session and API interception
+├── monday_handler.py      # Manages all Monday.com API interactions
+├── utils.py               # Helper functions (e.g., logging)
+├── 📁 config/
+│   ├── credentials.py     # Grab Portal login credentials
+│   ├── settings.py        # Board, group, and API endpoint configs
+│   └── .env.example       # Template for environment variables
+├── README.md
+└── requirements.txt
 ```
-
--   `extractor.py`: The heart of the operation. It initializes the scraper and sheet modules and manages the flow of data between them.
--   `gsheet.py`: A dedicated class `GSheet` that handles authentication and data transactions (reading/writing) with the Google Sheets API.
--   `grab_scraper.py`: Contains the `GrabScraper` class, which encapsulates all the web scraping logic using Selenium. It handles browser control, navigation, and data extraction.
 
 ## 🚀 How to Deploy
 
-Follow these steps to get the extractor up and running on your local machine.
-
 ### 1. Prerequisites
-
--   **Python 3.x**: Make sure you have Python installed.
--   **Google Chrome**: The scraper uses Chrome, so it must be installed.
--   **Google Cloud Project**: A project with the Google Sheets API enabled.
+- **Python 3.8+**
+- **Google Chrome**
+- A **Monday.com** account with an API key.
 
 ### 2. Installation & Setup
-
-1.  **Clone the Repository**:
+1.  **Clone the Repository** and navigate into the directory.
+2.  **Create a Virtual Environment**:
     ```bash
-    # If this were a git repository
-    git clone <your-repo-url>
-    cd sf-automation
-    ```
-
-2.  **Create a Virtual Environment (Recommended)**: Using a virtual environment keeps your project dependencies isolated.
-    ```bash
-    # Create the environment
     python -m venv venv
-
-    # Activate it
-    # On Windows:
-    venv\Scripts\activate
-    # On macOS/Linux:
-    source venv/bin/activate
+    # On Windows: venv\Scripts\activate
+    # On macOS/Linux: source venv/bin/activate
     ```
-
-3.  **Install Dependencies**: This project's dependencies are listed in `requirements.txt`. Install them all with one command:
+3.  **Install Dependencies**:
     ```bash
     pip install -r requirements.txt
     ```
 
-4.  **Google Sheets API Credentials**:
-    -   Go to your Google Cloud Console.
-    -   Create a **Service Account**.
-    -   Download the credentials as a `JSON` file.
+### 3. Configuration
+1.  **Environment Variables**: Create a `.env` file in the `config/` directory (copy from `config/.env.example`) and add your Monday.com API key.
+2.  **Grab Credentials**: In `config/credentials.py`, add the login details for the Grab Merchant Portal accounts.
+3.  **Settings**: In `config/settings.py`, configure the API endpoints and Monday.com board/group IDs.
+
+## 🧪 How to Run
+1.  **Activate your virtual environment**.
+2.  **Run the Extractor**: From the project's root directory, execute the main script.
+    ```bash
+    python main.py
+    ```
+3.  **Follow the Menu**: The script will present a menu to choose which account(s) to process.
+4.  **Verify the Output**: Check your Monday.com board to see the newly created items.
+
+---
+*This project was crafted to bring efficiency and automation to your data enrichment tasks.*
+1.  **Environment Variables**: Rename `config/.env.example` to `config/.env` and add your Monday.com API key.
+2.  **Grab Credentials**: In `config/credentials.py`, add the login details for the Grab Merchant Portal accounts.
+3.  **Settings**: In `config/settings.py`, configure the API endpoints and Monday.com board/group IDs.
+
+## 🧪 How to Run
+1.  **Activate your virtual environment**.
+2.  **Run the Extractor**: From the project's root directory, execute the main script.
+    ```bash
+    python main.py
+    ```
+3.  **Follow the Menu**: The script will present a menu to choose which account(s) to process.
+4.  **Verify the Output**: Check your Monday.com board to see the newly created items.
+
+---
+*This project was crafted to bring efficiency and automation to your data enrichment tasks.*
+    python -m src.main
+    ```
+3.  **Follow the Menu**: The script will present a menu to choose which account(s) to process.
+4.  **Verify the Output**: Check your Monday.com board to see the newly created items.
+
+---
+*This project was crafted to bring efficiency and automation to your data enrichment tasks.*
     -   **Important**: Share your Google Sheet with the `client_email` found in the JSON file, giving it "Editor" permissions.
-    -   Place the downloaded JSON file in the project directory.
+    -   Place the downloaded JSON file in the `credentials` directory.
 
 5.  **Chrome WebDriver**:
     -   Check your Google Chrome version (`Settings > About Chrome`).
     -   Download the matching version of **ChromeDriver** from the official site.
-    -   Place `chromedriver.exe` in the project directory.
+    -   Place `chromedriver.exe` in the `drivers` directory.
 
 ### 3. Configuration
 
-Open `extractor.py` and update the constants at the top of the `if __name__ == "__main__":` block:
+Create a `.env` file in the `config` directory with your settings:
 
-```python
-# extractor.py
-CREDENTIALS_PATH = 'path/to/your/credentials.json'
-SPREADSHEET_ID = 'your_google_sheet_id_from_its_url'
-WORKSHEET_NAME = 'Sheet1' # The name of the tab in your sheet
-DRIVER_PATH = 'path/to/your/chromedriver.exe'
+```env
+CREDENTIALS_PATH=credentials/superfood-test.json
+SPREADSHEET_ID=your_google_sheet_id
+WORKSHEET_NAME=Sheet1
+DRIVER_PATH=drivers/chromedriver.exe
+DELAY_BETWEEN_REQUESTS=2.0
+MAX_RETRIES=3
 ```
 
-## 🧪 How to Test
+Then update your imports in `extractor.py`:
 
-1.  **Prepare Your Google Sheet**: Ensure your sheet has columns for both input and output.
-    *   **Input Columns**: `Restaurant Name`, `Location` (should be filled with data).
-    *   **Output Columns**: `Store ID`, `Outlet Status` (will be populated by the script).
+```python
+from config.settings import load_config
+config = load_config()
+```
 
-2.  **Run the Extractor**: Open your terminal or command prompt, navigate to the project directory, and execute the script:
+## 🧪 How to Run
+
+1.  **Activate your virtual environment**.
+2.  **Run the Extractor**: From the project's root directory, execute the main script.
     ```bash
-    python extractor.py
+    python -m src.main
     ```
+3.  **Follow the Menu**: The script will present a menu to choose which account(s) to process.
+4.  **Monitor the Console**: The script will print its progress, showing which restaurant it's currently searching for.
+5.  **Verify the Output**: Once the script finishes, check your Google Sheet. The `Store ID`, `Outlet Name`, and `Outlet Status` columns should now be populated with the results!
 
-3.  **Monitor the Console**: The script will print its progress, showing which restaurant it's currently searching for.
+## 📦 Dependencies
 
-4.  **Verify the Output**: Once the script finishes, check your Google Sheet. The `Store ID` and `Outlet Status` columns should now be populated with the results!
+This project requires specific versions of dependencies for optimal performance:
+```
+gspread>=5.0.0
+pandas>=1.3.0
+selenium>=4.0.0
+```
+
+## 🔒 Data Privacy & Rate Limiting
+
+- **Privacy**: All data is processed locally and only exchanged between your Google Sheet and Grab Food
+- **Rate Limiting**: 
+  - Default delay: 2 seconds between requests
+  - Maximum recommended batch: 100 restaurants per hour
+  - Adjust `time.sleep()` values in `grab_scraper.py` for your needs
 
 ## 💡 Additional Information & Best Practices
 
@@ -128,4 +159,16 @@ DRIVER_PATH = 'path/to/your/chromedriver.exe'
 
 ---
 *This project was crafted to bring efficiency and automation to your data enrichment tasks.*
+-   **Error Handling**: The script is resilient. If a restaurant search fails, it logs "Not Found" and moves to the next one without crashing.
+-   **UI Changes**: This scraper depends on the structure of the Grab Food website. If the site's layout changes significantly, the `grab_scraper.py` module may need to be updated.
+-   **Rate Limiting**: The script includes small `time.sleep()` delays to mimic human behavior and avoid being blocked. For very large datasets, consider adding longer, randomized delays between requests.
+
+### Troubleshooting
+
+-   **`selenium.common.exceptions.SessionNotCreatedException`**: Your `chromedriver.exe` version does not match your installed Google Chrome version.
+-   **`gspread.exceptions.SpreadsheetNotFound`**: The `SPREADSHEET_ID` is incorrect, or you haven't shared the sheet with the service account's email.
+-   **`gspread.exceptions.WorksheetNotFound`**: The `WORKSHEET_NAME` does not exist in your spreadsheet.
+-   **Restaurants are consistently "Not Found"**: The location you're providing might be too general or too specific. Try different formats (e.g., "City", "Neighborhood, City").
+
+---
 *This project was crafted to bring efficiency and automation to your data enrichment tasks.*

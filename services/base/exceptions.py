@@ -1,23 +1,23 @@
 class ServiceError(Exception):
-    """Base class for exceptions in this module."""
+    """Base exception for all service errors"""
     pass
 
 
 class AuthenticationError(ServiceError):
-    """Raised when authentication fails."""
-    pass
-
-
-class APIError(ServiceError):
-    """Raised for API-specific errors."""
+    """Raised when service authentication fails"""
     pass
 
 
 class ConfigurationError(ServiceError):
-    """Raised for configuration-related errors."""
+    """Raised when configuration is invalid"""
     pass
 
 
-class BrowserError(ServiceError):
-    """Raised for browser automation errors."""
+class DataCollectionError(ServiceError):
+    """Raised when data collection fails"""
+    pass
+
+
+class ApiError(ServiceError):
+    """Raised for API-specific errors, e.g., from Monday.com"""
     pass

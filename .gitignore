@@ -1,0 +1,22 @@
+# Credentials and sensitive data
+credentials/*
+!credentials/.gitkeep
+
+# Drivers
+drivers/*
+!drivers/.gitkeep
+
+# Environment variables
+config/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp

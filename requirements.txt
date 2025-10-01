@@ -1,12 +1,12 @@
+python-dotenv
 requests
 selenium-wire
 webdriver-manager
-pandas
-gspread
+tqdm
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
 tqdm
-python-dotenv
 pytest
+pytest-mock
 pytest-mock

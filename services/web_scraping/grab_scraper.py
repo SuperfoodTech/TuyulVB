@@ -1,103 +1,121 @@
 import json
 import time
-from typing import Any, Dict, List, Optional
-
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-from services.web_scraping.base_browser import BaseBrowserSession
-from services.config import GRAB_MERCHANT_CONFIG, TARGET_API_URL, SINGLE_OUTLET_CHECK_URL
+from config import settings
+from utils.logging import log
+from services.base.exceptions import AuthenticationError, DataCollectionError
+from .base_browser import BaseBrowserSession
 
 
 class GrabScraper(BaseBrowserSession):
-    def __init__(self, credentials: Dict[str, Dict[str, str]], config: Optional[Dict[str, Any]] = None):
-        super().__init__(config or GRAB_MERCHANT_CONFIG)
-        self.credentials = credentials
+    """Manages the browser lifecycle for the Grab Merchant Portal."""
 
-    def handle_welcome_modal(self):
-        """Looks for a specific 'Tutup' welcome modal and closes it."""
+    def _safe_get(self, url):
         try:
-            short_wait = self.wait(10)
-            close_button_xpath = "//button[span[text()='Tutup'] or contains(@class, 'btn-skip')]"
+            self.driver.get(url)
+            return True
+        except TimeoutException:
+            log("error", f"Page took too long to load: {url}")
+            return False
 
-            self.logger.info("   Checking for the welcome modal...")
-            welcome_modal_button = short_wait.until(
-                EC.element_to_be_clickable((By.XPATH, close_button_xpath))
-            )
-            welcome_modal_button.click()
-            self.logger.info("   Closed the welcome modal.")
+    def _handle_welcome_modal(self):
+        try:
+            close_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[span[text()='Tutup'] or contains(@class, 'btn-skip')]")))
+            close_button.click()
+            log("info", "Closed the welcome modal.")
             time.sleep(1)
         except TimeoutException:
-            self.logger.info("   Welcome modal not found, proceeding.")
-            pass
+            log("info", "Welcome modal not found, proceeding.")
 
-    def login(self, account_name: str) -> bool:
-        """Handles the full login flow for a given account and navigates to the starting page."""
-        account_creds = self.credentials.get(account_name)
-        if not account_creds:
-            self.logger.error(
-                f"Credentials not found for account: {account_name}")
-            return False
+    def login(self, account_name, account_creds):
+        portal_config = settings.GRAB_MERCHANT_CONFIG
+        if self.current_account == account_name: return True
+        if self.current_account is not None: self.logout()
 
-        if self.current_account == account_name:
-            self.logger.info(
-                f"✅ Already logged in with {account_name} account.")
-            if not self.safe_get(self.config['merchant_list_url']):
-                self.logger.error("Failed to re-navigate to the menu page.")
-                return False
-            return True
-
-        if self.current_account is not None:
-            self.logger.info(
-                f"🔄 Switching accounts. Logging out from {self.current_account} first...")
-            self.logout()
-
-        self.logger.info(
-            f"🔑 Attempting to log in with {account_name} account...")
-        if not self.safe_get(self.config["login_url"]):
-            return False
+        log("info", f"Attempting to log in with {account_name} account...")
+        if not self._safe_get(portal_config["login_url"]):
+            raise AuthenticationError("Failed to load login page.")
 
         try:
-            self.handle_generic_popups()
-
             try:
-                self.logger.info(
-                    "   Checking for Login as another user button...")
-                another_user_button_wait = self.wait(2)
-                another_user_button = another_user_button_wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "//p[text()='Login as another user'] | //div[text()='Login as another user']")))
-                another_user_button.click()
-                self.logger.info("   Clicked Login as another user.")
-            except (TimeoutException, NoSuchElementException):
-                self.logger.info(
-                    "   No Login as another user button found, proceeding.")
-
-            self.logger.info("   ➡️ Entering username...")
-            username_field = self.wait.until(EC.visibility_of_element_located(
-                (By.ID, self.config["username_field_id"])))
-            username_field.clear()
-            username_field.send_keys(account_creds["username"])
-            self.logger.info("   ➡️ Clicking continue after username...")
-            continue_user_button = self.wait.until(EC.element_to_be_clickable(
-                (By.XPATH, self.config["continue_after_username_xpath"])))
-            continue_user_button.click()
-
-            self.logger.info("   ➡️ Entering password...")
-            password_field = self.wait.until(EC.visibility_of_element_located(
-                (By.ID, self.config["password_field_id"])))
-            password_field.clear()
-            password_field.send_keys(account_creds["password"])
-
-            self.logger.info("   ➡️ Clicking continue after password...")
-            final_login_button = self.wait.until(EC.element_to_be_clickable(
-                (By.XPATH, self.config["continue_after_password_xpath"])))
-            final_login_button.click()
-
+                WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable(
+                    (By.XPATH, "//p[text()='Login as another user'] | //div[text()='Login as another user']"))).click()
+            except (TimeoutException, NoSuchElementException): pass
+            self.wait.until(EC.visibility_of_element_located(
+                (By.ID, portal_config["username_field_id"]))).send_keys(account_creds["username"])
+            self.wait.until(EC.element_to_be_clickable(
+                (By.XPATH, portal_config["continue_after_username_xpath"]))).click()
+            self.wait.until(EC.visibility_of_element_located(
+                (By.ID, portal_config["password_field_id"]))).send_keys(account_creds["password"])
+            self.wait.until(EC.element_to_be_clickable(
+                (By.XPATH, portal_config["continue_after_password_xpath"]))).click()
             self.wait.until(EC.url_contains(
-                "https://merchant.grab.com/dashboard"))
-            if "login" in self.driver.current_url.lower():
-                self.logger.error(
+                "https://merchant.grab.com/portal"))
+            log("success", f"Login successful for {account_name}.")
+            self.current_account = account_name
+            self._handle_welcome_modal()
+            if not self._safe_get(portal_config['merchant_list_url']):
+                raise AuthenticationError(
+                    "Failed to navigate to the menu page after login.")
+            return True
+        except (TimeoutException, NoSuchElementException) as e:
+            raise AuthenticationError(
+                f"Error during login for {account_name}: {e}") from e
+
+    def logout(self):
+        if self.current_account is None: return
+        log("info", f"Logging out from {self.current_account} account...")
+        self._safe_get(settings.GRAB_MERCHANT_CONFIG["logout_url"])
+        time.sleep(3)
+        self.current_account = None
+
+    def collect_data(self):
+        log("info", "Starting data collection, waiting for merchant API call...")
+        del self.driver.requests
+        try:
+            request = self.driver.wait_for_request(
+                settings.TARGET_API_URL, timeout=30)
+            log("info", "Multi-outlet API found. Processing...")
+            data = json.loads(request.response.body.decode('utf-8'))
+            all_merchants = data.get("merchants", [])
+            has_more = data.get("hasMore", False)
+            if has_more:
+                scrollable_element = self.driver.find_element(
+                    By.CSS_SELECTOR, "div.dui-table-body")
+                while has_more:
+                    del self.driver.requests
+                    self.driver.execute_script(
+                        "arguments[0].scrollTop = arguments[0].scrollHeight", scrollable_element)
+                    try:
+                        scroll_request = self.driver.wait_for_request(
+                            settings.TARGET_API_URL, timeout=60)
+                        if scroll_request.response:
+                            data = json.loads(
+                                scroll_request.response.body.decode('utf-8'))
+                            all_merchants.extend(data.get("merchants", []))
+                            has_more = data.get("hasMore", False)
+                    except TimeoutException: break
+            return all_merchants, 'MULTI_OUTLET'
+        except TimeoutException:
+            log("info", "Multi-outlet API not found. Checking for single-outlet API...")
+            try:
+                request = self.driver.wait_for_request(
+                    settings.SINGLE_OUTLET_CHECK_URL, timeout=20)
+                if request.response:
+                    merchants = json.loads(request.response.body.decode(
+                        'utf-8')).get("merchants", [])
+                    return merchants, 'SINGLE_OUTLET'
+            except TimeoutException:
+                raise DataCollectionError(
+                    "Did not capture any merchant data API call.")
+        except (json.JSONDecodeError, NoSuchElementException) as e:
+            raise DataCollectionError(
+                f"Failed to get merchant data. Error: {e}") from e
+        return [], 'ERROR'
                     "Login failed. Check credentials or solve CAPTCHA.")
                 return False
 

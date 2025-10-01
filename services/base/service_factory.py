@@ -4,9 +4,12 @@ Initial lightweight implementation used for refactoring scaffolding.
 """
 from typing import Dict
 from .config_manager import ServiceConfig
+from services.monday.client import MondayClient
+from services.web_scraping.grab_scraper import GrabScraper
 
 
 class ServiceFactory:
+    """Manages the creation and retrieval of service instances."""
     _instances: Dict[str, object] = {}
     _config: ServiceConfig = None
 
@@ -20,28 +23,25 @@ class ServiceFactory:
     @classmethod
     def get_monday_client(cls):
         if 'monday' not in cls._instances:
-            from services.monday.client import MondayClient
             config = cls._get_config()
             cls._instances['monday'] = MondayClient(
                 api_key=config.monday_api_key)
         return cls._instances['monday']
 
     @classmethod
-    def get_sheets_client(cls):
-        if 'sheets' not in cls._instances:
-            from services.google_sheets.client import GoogleSheetsClient
-            config = cls._get_config()
-            cls._instances['sheets'] = GoogleSheetsClient(
-                creds_file=config.google_creds_file)
-        return cls._instances['sheets']
-
-    @classmethod
     def get_grab_scraper(cls):
         if 'grab_scraper' not in cls._instances:
-            from services.web_scraping.grab_scraper import GrabScraper
             config = cls._get_config()
             cls._instances['grab_scraper'] = GrabScraper(
                 credentials=config.grab_credentials)
+        return cls._instances['grab_scraper']
+
+    @classmethod
+    def shutdown_services(cls):
+        """Gracefully shuts down stateful services like web scrapers."""
+        if 'grab_scraper' in cls._instances:
+            cls._instances['grab_scraper'].quit()
+            del cls._instances['grab_scraper']
         return cls._instances['grab_scraper']
 
     @classmethod

@@ -1,54 +1,57 @@
 """Base browser session class to centralize Selenium setup and helpers."""
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, List
-import logging
-import time
-from selenium import webdriver
+from typing import Any, Dict, Optional, List, Tuple
+from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-from ..base.exceptions import BrowserError
+from utils.logging import log
+from services.base.exceptions import ServiceError
 
 
 class BaseBrowserSession(ABC):
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
-        self.driver: Optional[webdriver.Chrome] = None
-        self.wait: Optional[WebDriverWait] = None
-        self.current_account: Optional[str] = None
-        self.logger = logging.getLogger(self.__class__.__name__)
+    """Abstract Base Class for managing a browser session for web scraping."""
 
-    def setup_driver(self, headless: bool = True):
-        self.logger.info("🚀 Initializing browser...")
+    def __init__(self):
+        log("info", "🚀 Initializing browser...")
         try:
             service = Service(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
-            if headless:
-                options.add_argument("--headless=new")
+            options.add_argument('--log-level=3')
+            options.add_experimental_option(
+                'excludeSwitches', ['enable-logging'])
             options.add_argument(
                 '--disable-blink-features=AutomationControlled')
-
-            selenium_wire_options = {'disable_encoding': True}
-
             self.driver = webdriver.Chrome(
-                service=service,
-                options=options,
-                seleniumwire_options=selenium_wire_options
-            )
-            self.driver.set_page_load_timeout(60)
-            self.wait = WebDriverWait(self.driver, 60)
-            return self.driver
-        except WebDriverException as e:
-            self.logger.fatal(f"WebDriver initialization failed: {e.msg}")
-            self.driver = None
-            raise BrowserError(f"WebDriver initialization failed: {e.msg}")
+                service=service, options=options, seleniumwire_options={'disable_encoding': True})
+            self.driver.set_page_load_timeout(30)
+            self.wait = WebDriverWait(self.driver, 20)
+            self.current_account: Optional[str] = None
         except Exception as e:
-            self.logger.fatal(
-                f"An unexpected error occurred during browser setup: {e}")
-            self.driver = None
+            raise ServiceError("Browser initialization failed.") from e
+
+    @abstractmethod
+    def login(self, account_name: str, credentials: Dict[str, str]) -> bool:
+        """Logs into the target service."""
+        pass
+
+    @abstractmethod
+    def collect_data(self) -> Tuple[List[Dict[str, Any]], str]:
+        """Collects data from the target service."""
+        pass
+
+    @abstractmethod
+    def logout(self):
+        """Logs out from the target service."""
+        pass
+
+    def quit(self):
+        """Closes the browser and quits the driver."""
+        if self.driver:
+            log("info", "Closing browser.")
+            self.driver.quit()
             raise BrowserError(f"Unexpected error during browser setup: {e}")
 
     def teardown(self):

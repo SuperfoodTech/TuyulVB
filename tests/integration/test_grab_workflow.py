@@ -10,24 +10,32 @@ sys.path.insert(0, os.path.abspath(
 
 
 @pytest.mark.integration
-# Simulate running all accounts then exiting
-@patch('builtins.input', side_effect=['1', 'exit_option'])
-@patch('services.base.service_factory.ServiceFactory.get_grab_scraper')
 @patch('services.base.service_factory.ServiceFactory.get_sheets_client')
-def test_grab_workflow_runs_without_errors(mock_sheets_client, mock_grab_scraper, monkeypatch):
+@patch('services.base.service_factory.ServiceFactory.get_grab_scraper')
+def test_grab_workflow_runs_without_errors(mock_get_grab_scraper, mock_get_sheets_client, monkeypatch):
     """
     An integration test to ensure the Grab validation workflow runs end-to-end
     without crashing. This test mocks the external services.
     """
-    # Prevent the script from actually trying to exit
+    # Mock the input to select "run all"
+    monkeypatch.setattr('builtins.input', lambda _: '1')
+    # Prevent the script from calling sys.exit()
     monkeypatch.setattr("builtins.exit", lambda: None)
 
-    # Mock the return value for reading the worksheet
-    mock_sheets_client.return_value.read_worksheet_as_dataframe.return_value = MagicMock()
+    # Configure the mocks returned by the factory
+    mock_sheets_client = MagicMock()
+    mock_grab_scraper = MagicMock()
+    mock_get_sheets_client.return_value = mock_sheets_client
+    mock_get_grab_scraper.return_value = mock_grab_scraper
 
     try:
-        # Execute the script using runpy
+        # Execute the script's main function
         runpy.run_path(
             'monday-automation/grab-scrapper/grab-store-validation.py', run_name='__main__')
     except Exception as e:
         pytest.fail(f"Grab workflow failed with an exception: {e}")
+
+    # Assert that the key methods were called
+    mock_sheets_client.read_worksheet_as_dataframe.assert_called()
+    mock_grab_scraper.login.assert_called()
+    mock_grab_scraper.collect_data.assert_called()

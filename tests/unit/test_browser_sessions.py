@@ -14,6 +14,7 @@ class ConcreteBrowserSession(BaseBrowserSession):
         pass
 
 
+@pytest.mark.unit
 @patch('services.web_scraping.base_browser.webdriver.Chrome')
 def test_base_browser_initialization(mock_chrome):
     """Test that the BaseBrowserSession initializes correctly."""
