@@ -1,93 +1,131 @@
-# sf-automation
+# 🤖 Grab Food Data Extractor 🤖
 
+A powerful and efficient automation tool designed to extract key data for restaurants from Grab Food and update your Google Sheets. Say goodbye to manual searching!
 
+## ✨ What It Does
 
-## Getting started
+This project provides a seamless pipeline to enrich your restaurant database. It automates the tedious task of finding key restaurant data from Grab Food.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+The core workflow is as follows:
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+1.  **📖 Read Data**: The script securely connects to your Google Sheet and reads a list of restaurant names and their locations.
+2.  **🌐 Scrape Web**: For each restaurant, it launches a browser, navigates to Grab Food, and performs a search using the provided details.
+3.  **🔗 Extract Data**: Once the correct restaurant is found, it captures key information:
+    *   The internal **Grab Store ID**.
+    *   The actual **Outlet Name**
+    *   The current **Outlet Status** (e.g., Open, Closed).
+4.  **✍️ Update Sheet**: The script then populates the corresponding columns in your original Google Sheet with the extracted data. If a restaurant isn't found, it's gracefully marked as "Not Found".
 
-## Add your files
+This automation saves countless hours of manual work, reduces human error, and keeps your data up-to-date.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## 🏗️ Project Structure
+
+The project is organized into a modular structure for clarity, maintainability, and scalability.
 
 ```
-cd existing_repo
-git remote add origin http://sfgitlab.eng.superfoodapp.id/superfood-app/sf-automation.git
-git branch -M main
-git push -uf origin main
+sf-automation/
+├── 📜 README.md              # You are here!
+├── 📝 requirements.txt        # Project dependencies for pip.
+├── 🚀 extractor.py          # The main controller that orchestrates the workflow.
+├── 📊 gsheet.py             # Module for all Google Sheets interactions.
+├── 🕷️ grab_scraper.py        # Module for Selenium-based web scraping of Grab Food.
+├── 🔑 superfood-test-....json # Your Google API credentials file.
+└── 🚗 chromedriver.exe       # The Selenium WebDriver for Chrome.
 ```
 
-## Integrate with your tools
+-   `extractor.py`: The heart of the operation. It initializes the scraper and sheet modules and manages the flow of data between them.
+-   `gsheet.py`: A dedicated class `GSheet` that handles authentication and data transactions (reading/writing) with the Google Sheets API.
+-   `grab_scraper.py`: Contains the `GrabScraper` class, which encapsulates all the web scraping logic using Selenium. It handles browser control, navigation, and data extraction.
 
-- [ ] [Set up project integrations](http://sfgitlab.eng.superfoodapp.id/superfood-app/sf-automation/-/settings/integrations)
+## 🚀 How to Deploy
 
-## Collaborate with your team
+Follow these steps to get the extractor up and running on your local machine.
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### 1. Prerequisites
 
-## Test and Deploy
+-   **Python 3.x**: Make sure you have Python installed.
+-   **Google Chrome**: The scraper uses Chrome, so it must be installed.
+-   **Google Cloud Project**: A project with the Google Sheets API enabled.
 
-Use the built-in continuous integration in GitLab.
+### 2. Installation & Setup
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+1.  **Clone the Repository**:
+    ```bash
+    # If this were a git repository
+    git clone <your-repo-url>
+    cd sf-automation
+    ```
 
-***
+2.  **Create a Virtual Environment (Recommended)**: Using a virtual environment keeps your project dependencies isolated.
+    ```bash
+    # Create the environment
+    python -m venv venv
 
-# Editing this README
+    # Activate it
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
+    source venv/bin/activate
+    ```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+3.  **Install Dependencies**: This project's dependencies are listed in `requirements.txt`. Install them all with one command:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Suggestions for a good README
+4.  **Google Sheets API Credentials**:
+    -   Go to your Google Cloud Console.
+    -   Create a **Service Account**.
+    -   Download the credentials as a `JSON` file.
+    -   **Important**: Share your Google Sheet with the `client_email` found in the JSON file, giving it "Editor" permissions.
+    -   Place the downloaded JSON file in the project directory.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+5.  **Chrome WebDriver**:
+    -   Check your Google Chrome version (`Settings > About Chrome`).
+    -   Download the matching version of **ChromeDriver** from the official site.
+    -   Place `chromedriver.exe` in the project directory.
 
-## Name
-Choose a self-explaining name for your project.
+### 3. Configuration
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Open `extractor.py` and update the constants at the top of the `if __name__ == "__main__":` block:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```python
+# extractor.py
+CREDENTIALS_PATH = 'path/to/your/credentials.json'
+SPREADSHEET_ID = 'your_google_sheet_id_from_its_url'
+WORKSHEET_NAME = 'Sheet1' # The name of the tab in your sheet
+DRIVER_PATH = 'path/to/your/chromedriver.exe'
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## 🧪 How to Test
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+1.  **Prepare Your Google Sheet**: Ensure your sheet has columns for both input and output.
+    *   **Input Columns**: `Restaurant Name`, `Location` (should be filled with data).
+    *   **Output Columns**: `Store ID`, `Outlet Status` (will be populated by the script).
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+2.  **Run the Extractor**: Open your terminal or command prompt, navigate to the project directory, and execute the script:
+    ```bash
+    python extractor.py
+    ```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+3.  **Monitor the Console**: The script will print its progress, showing which restaurant it's currently searching for.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+4.  **Verify the Output**: Once the script finishes, check your Google Sheet. The `Store ID` and `Outlet Status` columns should now be populated with the results!
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## 💡 Additional Information & Best Practices
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+-   **Input Data Quality**: The more accurate the `Restaurant Name` and `Location`, the higher the success rate.
+-   **Error Handling**: The script is resilient. If a restaurant search fails, it logs "Not Found" and moves to the next one without crashing.
+-   **UI Changes**: This scraper depends on the structure of the Grab Food website. If the site's layout changes significantly, the `grab_scraper.py` module may need to be updated.
+-   **Rate Limiting**: The script includes small `time.sleep()` delays to mimic human behavior and avoid being blocked. For very large datasets, consider adding longer, randomized delays between requests.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Troubleshooting
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+-   **`selenium.common.exceptions.SessionNotCreatedException`**: Your `chromedriver.exe` version does not match your installed Google Chrome version.
+-   **`gspread.exceptions.SpreadsheetNotFound`**: The `SPREADSHEET_ID` is incorrect, or you haven't shared the sheet with the service account's email.
+-   **`gspread.exceptions.WorksheetNotFound`**: The `WORKSHEET_NAME` does not exist in your spreadsheet.
+-   **Restaurants are consistently "Not Found"**: The location you're providing might be too general or too specific. Try different formats (e.g., "City", "Neighborhood, City").
 
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+*This project was crafted to bring efficiency and automation to your data enrichment tasks.*
+*This project was crafted to bring efficiency and automation to your data enrichment tasks.*
