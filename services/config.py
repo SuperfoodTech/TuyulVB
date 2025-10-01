@@ -1,8 +1,9 @@
+import os
 # services/config.py
 
 # --- Google Sheets Configuration ---
-GOOGLE_SHEET_NAME = 'For Automate Validation'
-INPUT_WORKSHEET_NAME = 'Cluster 1 FWL'
+GOOGLE_SHEET_NAME = 'REPLACE_WITH_GOOGLE_SHEET_NAME'
+INPUT_WORKSHEET_NAME = 'REPLACE_WITH_INPUT_WORKSHEET_NAME'
 
 # --- Grab Portal Configuration ---
 GRAB_MERCHANT_CONFIG = {
@@ -75,8 +76,13 @@ SHOPEE_PARTNER_CONFIG = {
     "password_field_id": "password",
 }
 
+# --- Monday.com API Configuration ---
+MONDAY_API_KEY = os.getenv("MONDAY_API_KEY")
+MONDAY_API_URL = "https://api.monday.com/v2"
+MONDAY_BOARD_ID = 2075992045  # Board ID for main operations
+
 # --- Monday.com Duplication Watcher Configuration ---
-MONDAY_BOARD_ID = 2075483964
+MONDAY_DUPLICATION_BOARD_ID = 2075483964  # Board ID for duplication checking
 MONDAY_TARGET_GROUP_ID = "group_mkvxp4cr"
 MONDAY_TARGET_GROUP_NAME = "Merchant - Outlet - VB (Database)"
 DUPLICATE_CHECKS = [
