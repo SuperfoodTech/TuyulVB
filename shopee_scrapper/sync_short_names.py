@@ -18,6 +18,7 @@ try:
     # Refactored to use common modules
     from common.monday_api import execute_monday_query
     from common.shopee_utils import get_current_merchant_name, switch_merchant
+    from common.http_utils import parse_response_json
     from shopee_scrapper.config.credentials import ACCOUNT_CREDS
     from shopee_scrapper.config.settings import (
         MERCHANT_PROCESSING_LIST,
@@ -81,15 +82,11 @@ def collect_short_names(browser_session):
 
         for request in driver.requests:
             if api_pattern.search(request.url) and request.response:
-                body_bytes = request.response.body
-                if request.response.headers.get("Content-Encoding") == "gzip":
-                    response_text = gzip.decompress(body_bytes).decode("utf-8")
-                else:
-                    response_text = body_bytes.decode("utf-8")
-                response_json = json.loads(response_text)
-                new_stores = response_json.get("data", {}).get("list", [])
-                if new_stores:
-                    all_stores.extend(new_stores)
+                response_json = parse_response_json(request.response)
+                if response_json:
+                    new_stores = response_json.get("data", {}).get("list", [])
+                    if new_stores:
+                        all_stores.extend(new_stores)
 
         # The logger doesn't have a 'success' level by default, using 'info'
         log.info(f"✅ Total data collection complete. Found {len(all_stores)} stores.")
@@ -104,11 +101,15 @@ def collect_short_names(browser_session):
 
 # --- CORRECTED: Monday.com upload function with BATCH updates ---
 def update_short_names_on_monday(board_id, group_id, stores_data):
-    log.info(f"Updating {len(stores_data)} short names on Monday.com board '{board_id}'...")
+    log.info(
+        f"Updating {len(stores_data)} short names on Monday.com board '{board_id}'..."
+    )
     store_id_column = "text_mkvc896g"
     short_name_column = "text_mkwdygde"
 
-    log.info(f"  Fetching ALL existing items from group '{group_id}' (using pagination)...")
+    log.info(
+        f"  Fetching ALL existing items from group '{group_id}' (using pagination)..."
+    )
     existing_items_map = {}
     next_cursor = None
 
@@ -127,19 +128,25 @@ def update_short_names_on_monday(board_id, group_id, stores_data):
                 if item.get("column_values") and item["column_values"][0].get("text"):
                     existing_items_map[item["column_values"][0]["text"]] = item["id"]
 
-            log.info(f"  -> Fetched {len(items)} items on this page. Total fetched so far: {len(existing_items_map)}")
+            log.info(
+                f"  -> Fetched {len(items)} items on this page. Total fetched so far: {len(existing_items_map)}"
+            )
 
             if not next_cursor:
                 log.info("  All pages fetched.")
                 break
 
         except (KeyError, IndexError, TypeError, AttributeError):
-            log.error("  Could not parse existing items from Monday.com during fetch. Stopping pagination.")
+            log.error(
+                "  Could not parse existing items from Monday.com during fetch. Stopping pagination."
+            )
             break
 
         time.sleep(0.5)  # Be respectful of API limits between page requests
 
-    log.info(f"  Finished fetching. Found a total of {len(existing_items_map)} existing items to match against.")
+    log.info(
+        f"  Finished fetching. Found a total of {len(existing_items_map)} existing items to match against."
+    )
 
     items_to_update = []
     for store in stores_data:
@@ -147,12 +154,16 @@ def update_short_names_on_monday(board_id, group_id, stores_data):
         if store_id in existing_items_map:
             items_to_update.append(store)
         else:
-            log.warning(f"  Skipping Store ID {store_id} ('{store.get('storeName')}') as it was not found on the Monday.com board.")
+            log.warning(
+                f"  Skipping Store ID {store_id} ('{store.get('storeName')}') as it was not found on the Monday.com board."
+            )
 
     batch_size = 50
     for i in range(0, len(items_to_update), batch_size):
         batch = items_to_update[i : i + batch_size]
-        log.info(f"  Updating batch {i//batch_size + 1} of {(len(items_to_update) + batch_size - 1)//batch_size}...")
+        log.info(
+            f"  Updating batch {i//batch_size + 1} of {(len(items_to_update) + batch_size - 1)//batch_size}..."
+        )
 
         mutation_parts, variables, variable_definitions = [], {}, []
         for j, store in enumerate(batch):
@@ -209,7 +220,9 @@ def run_short_names_sync(browser_session, merchant_task):
     """
     group_id = GROUP_MAPPING.get(merchant_task["output_name"])
     if not group_id:
-        log.error(f"No Group ID found in settings.py for '{merchant_task['output_name']}'. Skipping.")
+        log.error(
+            f"No Group ID found in settings.py for '{merchant_task['output_name']}'. Skipping."
+        )
         return
 
     portal_data = collect_short_names(browser_session)

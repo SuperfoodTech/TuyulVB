@@ -14,6 +14,8 @@ try:
     # Assuming this script is run from the `shopee_scraper` directory
     from browser_session import BrowserSession, log
     from common.shopee_utils import get_current_merchant_name, switch_merchant
+    from common.http_utils import parse_response_json
+    from shopee_scrapper.pagination_utils import jump_to_page
     from shopee_scrapper.config.credentials import ACCOUNT_CREDS
     from shopee_scrapper.config.settings import MERCHANT_PROCESSING_LIST
 except ImportError:
@@ -21,69 +23,6 @@ except ImportError:
         f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [FATAL] Ensure `credentials.py` and `settings.py` are created and configured."
     )
     exit()
-
-
-def jump_to_page(driver, wait, target_page):
-    """
-    Jumps to a specific page using direct input or pagination buttons.
-    """
-    log.info(f"  Attempting to jump to page {target_page}...")
-
-    # --- Strategy 1: Use the direct input field (most efficient) ---
-    log.info(f"    -> Trying direct input method...")
-    try:
-        page_input = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//input[@aria-label='Page']"),
-            )
-        )
-        page_input.click()
-        page_input.clear()
-        page_input.send_keys(str(target_page))
-
-        lanjut_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Lanjut']]"))
-        )
-        lanjut_button.click()
-
-        log.info(f"    -> Successfully jumped to page {target_page} via input.")
-        return True
-    except TimeoutException:
-        log.warning("    -> Direct input field not found. Trying other methods...")
-
-    # --- Strategy 2: Click "Next 5 Pages" or the target page directly ---
-    log.info("    -> Trying 'Next 5 Pages' or direct page click method...")
-    for _ in range(10):  # Limit attempts to prevent infinite loops
-        try:
-            # First, try to find and click the target page button directly
-            target_button = driver.find_element(
-                By.XPATH, f"//li[@title='{target_page}']"
-            )
-            target_button.click()
-            log.info(f"    -> Successfully clicked button for page {target_page}.")
-            return True
-        except NoSuchElementException:
-            # If the target page button isn't visible, try clicking 'Next 5 Pages'
-            log.info(
-                f"    -> Page {target_page} not visible, trying 'Next 5 Pages'...",
-            )
-            try:
-                next_5_button = wait.until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//li[@title='Next 5 Pages']")
-                    )
-                )
-                next_5_button.click()
-                time.sleep(random.uniform(1.5, 2.5))  # Wait for UI to update
-            except (NoSuchElementException, TimeoutException):
-                log.warning("    -> Could not find 'Next 5 Pages' button.")
-                log.error(
-                    "    -> Advanced jump methods failed. The main loop will now rely on clicking 'Next Page'.",
-                )
-                return False
-
-    log.critical(f"  All methods to jump to page {target_page} failed.")
-    return False
 
 
 def collect_shopee_raw_data(browser_session, merchant_name):
@@ -128,16 +67,9 @@ def collect_shopee_raw_data(browser_session, merchant_name):
 
         if start_page == 1:
             if initial_request.response:
-                body_bytes = initial_request.response.body
-                response_text = (
-                    gzip.decompress(body_bytes).decode("utf-8")
-                    if initial_request.response.headers.get("Content-Encoding")
-                    == "gzip"
-                    else body_bytes.decode("utf-8")
-                )
-                response_json = json.loads(response_text)
+                response_json = parse_response_json(initial_request.response)
 
-                if response_json.get("code") != 0:
+                if response_json and response_json.get("code") != 0:
                     log.error(
                         f"  Initial API call failed with error: {response_json.get('msg')}. Cooldown and retry.",
                     )

@@ -20,6 +20,8 @@ try:
     from browser_session import BrowserSession, log
     from common.monday_api import execute_monday_query
     from common.shopee_utils import get_current_merchant_name, switch_merchant
+    from common.http_utils import parse_response_json
+    from shopee_scrapper.pagination_utils import jump_to_page
     from shopee_scrapper.config.credentials import ACCOUNT_CREDS
     from shopee_scrapper.config.settings import MERCHANT_PROCESSING_LIST
 except ImportError as e:
@@ -33,79 +35,7 @@ except ImportError as e:
 load_dotenv()
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-
-def send_discord_notification(webhook_url, message_embed):
-    """(This function is no longer called but is kept for future use)"""
-    if not webhook_url:
-        log.info("Discord webhook URL not configured. Skipping notification.")
-        return
-
-    payload = {"embeds": [message_embed]}
-    try:
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status()
-        log.info("Successfully sent Discord notification.")
-    except requests.exceptions.RequestException as e:
-        log.error(f"Failed to send Discord notification: {e}")
-
-
-def get_board_name(board_id):
-    """(This function is no longer called but is kept for future use)"""
-    log.info(f"Fetching board name for board ID: {board_id}...")
-    query = f"query {{ boards(ids: {board_id}) {{ name }} }}"
-    response = execute_monday_query(query)
-    try:
-        return response["data"]["boards"][0]["name"]
-    except (KeyError, IndexError, TypeError):
-        log.error(f"Could not fetch board name for board ID {board_id}.")
-        return f"Board {board_id}"  # Fallback
-
-
 # --- Selenium and Data Collection Functions ---
-
-
-def jump_to_page(driver, wait, target_page):
-    """
-    (This function is reused from your original script for error recovery)
-    Attempts to click a specific page number in the pagination controls.
-    """
-    log.info(f"    Attempting to fast-forward to page {target_page}...")
-    for _ in range(10):
-        try:
-            # Try to find the page number directly
-            target_button = driver.find_element(
-                By.XPATH, f"//li[@title='{target_page}']"
-            )
-            target_button.click()
-            log.info(f"    Successfully clicked button for page {target_page}.")
-            return True
-        except NoSuchElementException:
-            log.info(
-                f"    Page {target_page} not visible, trying to click 'Next 5 Pages'..."
-            )
-            try:
-                # If not visible, click 'Next 5 Pages'
-                next_5_button = wait.until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//li[@title='Next 5 Pages']")
-                    )
-                )
-                next_5_button.click()
-                time.sleep(random.uniform(2, 3))
-            except (NoSuchElementException, TimeoutException):
-                log.error("    Could not find 'Next 5 Pages' button. Cannot recover.")
-                return False
-    log.error("    Failed to jump to target page after multiple attempts.")
-    return False
-
-
-def decode_response_body(response):
-    """Decodes gzipped or plain text response body."""
-    body_bytes = response.body
-    if response.headers.get("Content-Encoding") == "gzip":
-        return gzip.decompress(body_bytes).decode("utf-8")
-    else:
-        return body_bytes.decode("utf-8")
 
 
 def collect_transaction_data(browser_session):
@@ -239,10 +169,9 @@ def collect_transaction_data(browser_session):
 
         # --- Initial response processing (Page 1) ---
         if initial_request.response:
-            response_text = decode_response_body(initial_request.response)
-            response_json = json.loads(response_text)
+            response_json = parse_response_json(initial_request.response)
 
-            if response_json.get("errorCode") != 0:
+            if response_json and response_json.get("errorCode") != 0:
                 log.error(
                     f"    Initial API call failed: {response_json.get('errorMsg')}. Cooldown and retry."
                 )

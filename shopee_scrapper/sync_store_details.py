@@ -15,6 +15,7 @@ try:
 
     # Refactored to use common modules
     from common.monday_api import execute_monday_query
+    from common.monday_utils import get_board_name
     from common.notifications import send_discord_notification
     from shopee_scrapper.config.credentials import ACCOUNT_CREDS
     from shopee_scrapper.config.settings import (
@@ -31,21 +32,6 @@ except ImportError:
 # --- Load Environment Variables for Notifications ---
 load_dotenv()
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-
-
-def get_board_name(board_id):
-    """Fetches the name of a board from Monday.com."""
-    log.info(f"Fetching board name for board ID: {board_id}...")
-    query = f"query {{ boards(ids: {board_id}) {{ name }} }}"
-    response = execute_monday_query(query)
-    try:
-        return response["data"]["boards"][0]["name"]
-    except (KeyError, IndexError, TypeError):
-        log.error(f"Could not fetch board name for board ID {board_id}.")
-        return f"Board {board_id}"  # Fallback
-
-
-# --- Selenium and Data Collection Functions ---
 
 
 def _handle_stale_entries(board_id, existing_items_map, fresh_store_ids):

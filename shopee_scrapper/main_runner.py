@@ -37,6 +37,7 @@ try:
     from shopee_scrapper.sync_klikit_unified import (
         run_unified_sync as run_klikit_unified,
     )
+    from shopee_scrapper.force_open import run_force_open
 
 except ImportError as e:
     print(f"[FATAL] An import failed: {e}. Ensure all config files are correct.")
@@ -86,7 +87,7 @@ def handle_profile_reset(session):
     return session, session is not None and session.driver is not None
 
 
-def main(task_name, dry_run=False):
+def main(task_name, dry_run=False, scale_level=1):
     """Main execution block for all Shopee-related tasks."""
     task_map = {
         "sync_details": run_store_details_sync,
@@ -97,6 +98,7 @@ def main(task_name, dry_run=False):
         "klikit_oph": run_klikit_oph,
         "klikit_unified": run_klikit_unified,
         "extract_raw": run_raw_extraction,
+        "force_open": run_force_open,
     }
 
     task_function = task_map.get(task_name)
@@ -218,7 +220,15 @@ def main(task_name, dry_run=False):
 
             if switch_successful:
                 # Call the specific task function with the browser session and merchant info
-                task_function(browser_session, merchant_task)
+                if task_name == "force_open":
+                    task_function(
+                        browser_session,
+                        merchant_task,
+                        scale_level=scale_level,
+                        dry_run=dry_run,
+                    )
+                else:
+                    task_function(browser_session, merchant_task)
             else:
                 log.warning(
                     f"Could not switch to merchant {merchant_task['validate_name']}. Skipping.",
@@ -244,6 +254,7 @@ if __name__ == "__main__":
             "klikit_grab_validation",
             "klikit_unified",
             "extract_raw",
+            "force_open",
         ],
         help="The specific scraping task to perform.",
     )
@@ -252,5 +263,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Run the task in dry-run mode (no changes to Monday.com). Currently supported by: klikit_validation, klikit_oph, klikit_grab_validation, klikit_unified.",
     )
+    parser.add_argument(
+        "--scale",
+        type=int,
+        default=1,
+        help="Scale Level (1-5) for force_open task. Defaults to 1.",
+    )
     args = parser.parse_args()
-    main(args.task, args.dry_run)
+    main(args.task, args.dry_run, args.scale)
