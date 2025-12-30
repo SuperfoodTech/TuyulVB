@@ -1,0 +1,41 @@
+import logging
+from dotenv import load_dotenv
+
+# Import the shared watcher logic
+from monday_automation.common_watcher import run_watcher_loop
+
+# --- Load Configuration from files ---
+load_dotenv()
+try:
+    from monday_automation.config import dupsettings
+except ImportError:
+    print("FATAL: dupsettings.py file not found. Please create it.")
+    exit()
+
+# --- Global Settings ---
+POLL_INTERVAL_SECONDS = 60
+STATE_FILE = "monday_state_vbo.json"
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+
+# --- Main Watcher Logic ---
+
+
+def main():
+    """Sets up and runs the watcher for the VBO board."""
+    run_watcher_loop(
+        board_id=dupsettings.MONDAY_BOARD_ID_VBO,
+        duplicate_checks=dupsettings.DUPLICATE_CHECKS_VBO,
+        target_group_id_val=getattr(dupsettings, "MONDAY_TARGET_GROUP_ID_VBO", None),
+        target_group_name_val=getattr(dupsettings, "MONDAY_TARGET_GROUP_NAME_VBO", ""),
+        state_file=STATE_FILE,
+        poll_interval=POLL_INTERVAL_SECONDS,
+    )
+
+
+if __name__ == "__main__":
+    main()
