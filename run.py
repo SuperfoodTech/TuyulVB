@@ -54,6 +54,12 @@ SCRIPTS = [
         "args": ["--task", "sync_customers"],
     },
     {
+        "name": "Shopee: Force Open Stores",
+        "path": os.path.join("shopee_scrapper", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "args": ["--task", "force_open", "--scale", "1"],
+    },
+    {
         "name": "Grab: Get Merchant Data",
         "path": os.path.join("grab_scrapper", "monday-grab-extract.py"),
         "cwd": os.path.join(PROJECT_ROOT, "grab_scrapper"),
