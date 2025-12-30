@@ -45,6 +45,7 @@ except ImportError as e:
 
 # Use the centralized logger
 log = get_logger("shopee_runner")
+log.propagate = False
 
 
 def display_merchant_menu():
@@ -89,6 +90,9 @@ def handle_profile_reset(session):
 
 def main(task_name, dry_run=False, scale_level=1):
     """Main execution block for all Shopee-related tasks."""
+    # Remove default root logger handlers to prevent double logging from imported libraries
+    logging.getLogger().handlers = []
+
     task_map = {
         "sync_details": run_store_details_sync,
         "sync_short_names": run_short_names_sync,
@@ -125,9 +129,9 @@ def main(task_name, dry_run=False, scale_level=1):
         try:
             choice = int(input(f"Enter number (1-{base_index + 1}): "))
             # Re-enable logging after input is received
-            log.setLevel(logging.NOTSET)
+            log.setLevel(logging.INFO)
         except ValueError:
-            log.setLevel(logging.NOTSET)  # Re-enable logging on error
+            log.setLevel(logging.INFO)  # Re-enable logging on error
             log.error("Invalid input.")
             continue
 

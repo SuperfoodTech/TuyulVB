@@ -14,4 +14,7 @@ def get_logger(name):
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+    # Disable propagation to prevent duplicate log messages
+    logger.propagate = False
     return logger

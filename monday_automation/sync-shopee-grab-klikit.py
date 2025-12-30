@@ -1,11 +1,9 @@
-import os
-import json
+﻿import json
 import logging
 import time
-from dotenv import load_dotenv
-import requests
 import argparse
 import sys
+import os
 
 # --- Setup Project Path ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -14,20 +12,22 @@ if PROJECT_ROOT not in sys.path:
 
 from common.monday_api import execute_monday_query
 from common.notifications import send_discord_notification
+from common.monday_utils import get_all_items_from_group, get_col_value
+from common.config import EnvConfig, ConfigurationError
+from common.logging_config import LOG_FORMAT, DATE_FORMAT
 
 # --- Configuration ---
-load_dotenv()
-API_KEY = os.getenv("MONDAY_API_KEY")
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+log.basicConfig(level=log.INFO, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+log = log.getLogger("sync_klikit")
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-if not API_KEY:
-    raise ValueError(
-        "MONDAY_API_KEY not found in .env file. Please create a .env file and add it."
-    )
+try:
+    config = EnvConfig()
+    config.validate()
+    API_KEY = config.MONDAY_API_KEY
+    DISCORD_WEBHOOK_URL = config.DISCORD_WEBHOOK_URL
+except ConfigurationError as e:
+    log.critical(f"Configuration error: {e}")
+    sys.exit(1)
 
 
 CONFIG_FILE_PATH = os.path.join(
@@ -39,74 +39,17 @@ def load_sync_map(file_path):
     """Loads the sync map configuration from a JSON file."""
     try:
         with open(file_path, "r") as f:
-            logging.info(f"Loading sync configuration from {file_path}")
+            log.info(f"Loading sync configuration from {file_path}")
             return json.load(f)
     except FileNotFoundError:
-        logging.error(f"Configuration file not found at {file_path}. Aborting.")
+        log.error(f"Configuration file not found at {file_path}. Aborting.")
         sys.exit(1)
     except json.JSONDecodeError:
-        logging.error(f"Invalid JSON in configuration file {file_path}. Aborting.")
+        log.error(f"Invalid JSON in configuration file {file_path}. Aborting.")
         sys.exit(1)
 
 
 # --- Helper Functions ---
-
-
-def get_all_items_from_group(board_id, group_id, column_ids):
-    """Fetches all items from a single group on a board, handling pagination."""
-    all_items = []
-    cursor = None
-    query = """
-    query getItems($boardId: [ID!]!, $groupIds: [String!], $cursor: String, $columnIds: [String!]) {
-        boards(ids: $boardId) {
-            groups(ids: $groupIds) {
-                items_page(limit: 500, cursor: $cursor) {
-                    cursor
-                    items { id name column_values(ids: $columnIds) { id text } }
-                }
-            }
-        }
-    }
-    """
-    while True:
-        variables = {
-            "boardId": [board_id],
-            "groupIds": [group_id],
-            "cursor": cursor,
-            "columnIds": column_ids,
-        }
-        response = execute_monday_query(query, variables)
-        if not response or "errors" in response:
-            logging.error(
-                f"Error fetching items for board {board_id}, group {group_id}: {response.get('errors')}"
-            )
-            break
-        groups_data = response["data"]["boards"][0].get("groups", [])
-        if not groups_data:
-            logging.warning(
-                f"Group ID {group_id} not found on board '{board_id}' or is empty."
-            )
-            break
-        items_page = groups_data[0].get("items_page", {})
-        items = items_page.get("items", [])
-        all_items.extend(items)
-        cursor = items_page.get("cursor")
-        if not cursor:
-            break
-        time.sleep(0.5)
-    return all_items
-
-
-def get_col_value(item, column_id):
-    """Safely gets the 'text' value from an item's column_values."""
-    return next(
-        (
-            col.get("text")
-            for col in item.get("column_values", [])
-            if col.get("id") == column_id
-        ),
-        None,
-    )
 
 
 def build_lookup_map(items, key_col, val_cols):
@@ -116,7 +59,7 @@ def build_lookup_map(items, key_col, val_cols):
         key = get_col_value(item, key_col)
         if key:
             if key in lookup_map:
-                logging.warning(f"Duplicate Store ID '{key}' found in source data.")
+                log.warning(f"Duplicate Store ID '{key}' found in source data.")
 
             lookup_map[key] = {
                 val_col: get_col_value(item, val_col) for val_col in val_cols
@@ -137,12 +80,12 @@ def main(dry_run=False):
     SYNC_MAP = config["sync_map"]
 
     if dry_run:
-        logging.warning("=" * 50)
-        logging.warning("### SCRIPT IS RUNNING IN DRY-RUN MODE ###")
-        logging.warning("### NO ACTUAL UPDATES WILL BE SENT TO MONDAY.COM ###")
-        logging.warning("=" * 50)
+        log.warning("=" * 50)
+        log.warning("### SCRIPT IS RUNNING IN DRY-RUN MODE ###")
+        log.warning("### NO ACTUAL UPDATES WILL BE SENT TO MONDAY.COM ###")
+        log.warning("=" * 50)
     else:
-        logging.info("Starting full name and short name sync script...")
+        log.info("Starting full name and short name sync script...")
 
     stats = {
         "total_updates_queued": 0,
@@ -152,14 +95,14 @@ def main(dry_run=False):
         "skipped_no_change": 0,
     }
     # --- Step 1: Build all lookup maps from all source boards/groups ---
-    logging.info("--- Building Lookup Maps from Source Boards ---")
+    log.info("--- Building Lookup Maps from Source Boards ---")
     lookup_maps = {}
     for mapping in SYNC_MAP:
         map_key = f"{mapping['source_board']}_{mapping['source_group']}"
         if map_key in lookup_maps:
             continue
 
-        logging.info(
+        log.info(
             f"Fetching source items for: {mapping['name']} (Board: {mapping['source_board']}, Group: {mapping['source_group']})"
         )
 
@@ -178,10 +121,10 @@ def main(dry_run=False):
         lookup_maps[map_key] = build_lookup_map(
             source_items, mapping["source_sid_col"], cols_to_fetch
         )
-        logging.info(f"  -> Built map with {len(lookup_maps[map_key])} entries.")
+        log.info(f"  -> Built map with {len(lookup_maps[map_key])} entries.")
 
     # --- Step 2: Fetch all target items ---
-    logging.info(f"\n--- Fetching Target Items from Board {TARGET_BOARD_ID} ---")
+    log.info(f"\n--- Fetching Target Items from Board {TARGET_BOARD_ID} ---")
     # Fetch all columns we need to read from the target board for comparison
     target_cols_to_fetch = set()
     for m in SYNC_MAP:
@@ -193,10 +136,10 @@ def main(dry_run=False):
     target_items = get_all_items_from_group(
         TARGET_BOARD_ID, TARGET_GROUP_ID, list(target_cols_to_fetch)
     )
-    logging.info(f"Found {len(target_items)} items to process in target group.")
+    log.info(f"Found {len(target_items)} items to process in target group.")
 
     # --- Step 3: Process and update target items ---
-    logging.info(f"\n--- Processing {len(target_items)} Target Items ---")
+    log.info(f"\n--- Processing {len(target_items)} Target Items ---")
     for item in target_items:
         item_id = item["id"]
         item_name = item["name"]
@@ -232,7 +175,7 @@ def main(dry_run=False):
 
         if updates_to_make:
             log_prefix = "[DRY RUN] Would update" if dry_run else "Queueing update for"
-            logging.info(f"  {log_prefix} item '{item_name}' ({item_id}).")
+            log.info(f"  {log_prefix} item '{item_name}' ({item_id}).")
             stats["items_to_update"] += 1
             stats["total_updates_queued"] += len(updates_to_make)
 
@@ -265,7 +208,7 @@ def main(dry_run=False):
                             raise Exception(f"API returned an error: {error_details}")
 
                         # If successful, break the retry loop
-                        logging.info(
+                        log.info(
                             f"    -> Successfully updated item '{item_name}' ({item_id})."
                         )
                         stats["items_updated_successfully"] += 1
@@ -273,17 +216,17 @@ def main(dry_run=False):
                         break
 
                     except Exception as e:
-                        logging.warning(
+                        log.warning(
                             f"    !! Attempt {attempt + 1}/{max_retries} failed for item {item_id}: {e}"
                         )
                         if attempt < max_retries - 1:
                             delay = 2 ** (
                                 attempt + 1
                             )  # Exponential backoff (2, 4 seconds)
-                            logging.info(f"    -> Retrying in {delay} seconds...")
+                            log.info(f"    -> Retrying in {delay} seconds...")
                             time.sleep(delay)
                         else:
-                            logging.error(
+                            log.error(
                                 f"    !! FAILED to update item {item_id} after {max_retries} attempts."
                             )
                             stats["errors"] += 1
@@ -293,12 +236,10 @@ def main(dry_run=False):
                             )
 
         else:
-            logging.info(
-                f"  Skipping item '{item_name}' ({item_id}). No changes needed."
-            )
+            log.info(f"  Skipping item '{item_name}' ({item_id}). No changes needed.")
             stats["skipped_no_change"] += 1
 
-    logging.info("\n--- Sync Complete ---")
+    log.info("\n--- Sync Complete ---")
     report_title = (
         "**DRY RUN** Sync Report"
         if dry_run
@@ -318,7 +259,7 @@ def main(dry_run=False):
         failed_list = "\n".join(stats["failed_items"])
         summary_message += f"\n\n**Failed Items:**\n```{failed_list}```"
 
-    logging.info(summary_message.replace("**", "").replace("`", ""))
+    log.info(summary_message.replace("**", "").replace("`", ""))
 
     # Send the general report (for both dry-run and production)
     send_discord_notification(
