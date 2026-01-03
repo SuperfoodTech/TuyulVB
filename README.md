@@ -257,6 +257,18 @@ For scripts requiring Shopee login:
 21. **Monday: Sync Full & Short Names (Klikit Migration Database) - DRY RUN**
     - Preview mode for Klikit Migration Database sync
 
+### Store Status Automation
+
+22. **Shopee: Force Open/Close Scheduler**
+    - **Script**: `shopee_scrapper/force_open_scheduler.py` (or `run_force_open_scheduler.bat`)
+    - **Function**: Continuously monitors Monday.com for store status override requests (runs every 15 minutes).
+    - **Logic**:
+      - **Input**: Checks Monday.com column for "Yes X" (where X <= Scale Level) and "Closed Req" status.
+      - **Open Action**: If "Closed Req" is empty/Open, ensures store is "Buka". If currently "Tutup Sementara", it clicks "Buka Outlet".
+      - **Close Action**: If "Closed Req" is "Closed", ensures store is "Tutup Sementara". If currently "Buka", it clicks "Tutup Outlet Sementara" -> "Sepanjang Hari".
+      - **Validation**: Double-checks success via network API response (primary) and UI badge status (secondary).
+    - **Reporting**: Sends consolidated Discord notifications with stacked fields (Forced Open, Forced Close, Already Open, Failed, etc.).
+
 ## 🔧 Advanced Features
 
 ### Dry-Run Mode
