@@ -35,35 +35,29 @@ def jump_to_page(driver, wait, target_page):
     # Strategy 1: Use the direct input field (most efficient)
     log.info("  -> Trying direct input method...")
     try:
-        page_input = wait.until(
+        page_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//input[@aria-label='Page']"),
-            ),
-            timeout=10,
+            )
         )
         page_input.click()
         page_input.clear()
         page_input.send_keys(str(target_page))
 
-        lanjut_button = wait.until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[.//span[text()='Lanjut']]")
-            ),
-            timeout=10,
+        lanjut_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Lanjut']]"))
         )
         lanjut_button.click()
         time.sleep(random.uniform(1, 2))
-
+        
         log.info(f"  -> Successfully jumped to page {target_page} via input.")
         return True
     except TimeoutException:
         log.warning("  -> Direct input field not found. Trying other methods...")
 
-    # Strategy 2: Click "Next 5 Pages" or the target page directly
     log.info("  -> Trying 'Next 5 Pages' or direct page click method...")
     for attempt in range(10):  # Limit attempts to prevent infinite loops
         try:
-            # First, try to find and click the target page button directly
             target_button = driver.find_element(
                 By.XPATH, f"//li[@title='{target_page}']"
             )
@@ -72,14 +66,12 @@ def jump_to_page(driver, wait, target_page):
             log.info(f"  -> Successfully clicked button for page {target_page}.")
             return True
         except NoSuchElementException:
-            # If the target page button isn't visible, try clicking 'Next 5 Pages'
             log.info(f"  -> Page {target_page} not visible, trying 'Next 5 Pages'...")
             try:
-                next_5_button = wait.until(
+                next_5_button = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable(
                         (By.XPATH, "//li[@title='Next 5 Pages']")
-                    ),
-                    timeout=5,
+                    )
                 )
                 next_5_button.click()
                 time.sleep(random.uniform(1.5, 2.5))
