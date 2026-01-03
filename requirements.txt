@@ -16,3 +16,6 @@ python-dotenv
 # For progress bars in console applications
 tqdm
 openpyxl
+
+# For scheduling tasks
+schedule
