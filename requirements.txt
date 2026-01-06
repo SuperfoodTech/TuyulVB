@@ -19,3 +19,7 @@ openpyxl
 
 # For scheduling tasks
 schedule
+
+# For Async API Client
+aiohttp
+cachetools

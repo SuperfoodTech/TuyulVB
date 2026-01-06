@@ -31,123 +31,139 @@ log = get_logger("run")
 SCRIPTS = [
     {
         "name": "Shopee: Extract Raw Store Data",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "extract_raw"],
     },
     {
         "name": "Shopee: Get Full Store Details",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "sync_details"],
     },
     {
         "name": "Shopee: Get Store Short Names",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "sync_short_names"],
     },
     {
         "name": "Shopee: Get Customer Details from Transactions",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "sync_customers"],
     },
     {
         "name": "Shopee: Force Open Stores",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "force_open", "--scale", "1"],
     },
     {
         "name": "Grab: Get Merchant Data",
-        "path": os.path.join("grab_scrapper", "monday-grab-extract.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "grab_scrapper"),
+        "path": os.path.join("modules", "grab", "monday-grab-extract.py"),
+        "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Watch for Duplicates Board SSOT",
-        "path": os.path.join("monday_automation", "watch_duplicates_ssot.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "watch_duplicates_ssot.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Watch for Duplicates Board VBO Naming",
-        "path": os.path.join("monday_automation", "watch_duplicates_vbo.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "watch_duplicates_vbo.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Watch for Duplicates Board Manual Disbursement (Order ID)",
-        "path": os.path.join("monday_automation", "watch_duplicates_orderid.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "watch_duplicates_orderid.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Input WA Numbers from Excel",
-        "path": os.path.join("monday_automation", "input-wa.py"),
+        "path": os.path.join("modules", "monday", "automation", "input-wa.py"),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Grab: Address Validation",
-        "path": os.path.join("grab_scrapper", "monday-grab-address-validation.py"),
+        "path": os.path.join("modules", "grab", "monday-grab-address-validation.py"),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Grab: Klikit Address Validation",
-        "path": os.path.join("grab_scrapper", "sync_address_klikit_grab.py"),
+        "path": os.path.join("modules", "grab", "sync_address_klikit_grab.py"),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Sync Short Names (Pull -> SSOT)",
-        "path": os.path.join("monday_automation", "short_name_updater.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "short_name_updater.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Shopee: Address Validation",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "address_validation"],
     },
     {
         "name": "Shopee: Klikit Address Validation",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "klikit_validation"],
     },
     {
         "name": "Shopee: Klikit Address Validation - DRY RUN",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "klikit_validation", "--dry-run"],
     },
     {
         "name": "Shopee: Klikit OPH Sync (Open/Closed)",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "klikit_oph"],
     },
     {
         "name": "Shopee/Grab: Unified Klikit Sync (Address & OPH)",
-        "path": os.path.join("shopee_scrapper", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "shopee_scrapper"),
+        "path": os.path.join("modules", "shopee", "main_runner.py"),
+        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "klikit_unified"],
     },
     {
         "name": "Monday: Sync Full & Short Names (VB Database)",
-        "path": os.path.join("monday_automation", "sync-shopee-grab-vbo.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Sync Full & Short Names (VB Database) - DRY RUN",
-        "path": os.path.join("monday_automation", "sync-shopee-grab-vbo.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
+        ),
         "cwd": PROJECT_ROOT,
         "args": ["--dry-run"],
     },
     {
         "name": "Monday: Sync Full & Short Names (Klikit Migration Database)",
-        "path": os.path.join("monday_automation", "sync-shopee-grab-klikit.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "sync-shopee-grab-klikit.py"
+        ),
         "cwd": PROJECT_ROOT,
     },
     {
         "name": "Monday: Sync Full & Short Names (Klikit Migration Database) - DRY RUN",
-        "path": os.path.join("monday_automation", "sync-shopee-grab-klikit.py"),
+        "path": os.path.join(
+            "modules", "monday", "automation", "sync-shopee-grab-klikit.py"
+        ),
         "cwd": PROJECT_ROOT,
         "args": ["--dry-run"],
     },
@@ -357,9 +373,9 @@ def run_health_check():
 
     # 2. Shopee Scrapper
     log.info("Checking Shopee Scrapper Configurations...")
-    check_module_vars("shopee_scrapper.config.credentials", {"ACCOUNT_CREDS": dict})
+    check_module_vars("config.credentials_shopee", {"ACCOUNT_CREDS": dict})
     check_module_vars(
-        "shopee_scrapper.config.settings",
+        "config.settings_shopee",
         {
             "MERCHANT_PROCESSING_LIST": {
                 "type": list,
@@ -374,9 +390,9 @@ def run_health_check():
 
     # 3. Grab Scrapper
     log.info("Checking Grab Scrapper Configurations...")
-    check_module_vars("grab_scrapper.credentials", {"ACCOUNT_CREDS": dict})
+    check_module_vars("config.credentials_grab", {"ACCOUNT_CREDS": dict})
     check_module_vars(
-        "grab_scrapper.settings",
+        "config.settings_grab",
         {
             "GRAB_MERCHANT_CONFIG": {
                 "type": dict,
@@ -404,7 +420,7 @@ def run_health_check():
     # 4. Monday Automation - Watch Duplicates
     log.info("Checking Monday 'Watch Duplicates' Configurations...")
     check_module_vars(
-        "monday_automation.config.dupsettings",
+        "modules.monday.automation.config_dupsettings",
         {
             "MONDAY_BOARD_ID_SSOT": int,
             "DUPLICATE_CHECKS_SSOT": {"type": list, "items": ["source", "target"]},
@@ -439,9 +455,7 @@ def run_health_check():
     # 6. Monday Automation - VBO Sync
     log.info("Checking Monday 'VBO Sync' Configurations...")
     check_json_file(
-        os.path.join(
-            PROJECT_ROOT, "monday_automation", "config", "vbo_sync_config.json"
-        ),
+        os.path.join(PROJECT_ROOT, "data", "config", "vbo_sync_config.json"),
         {
             "target_board_id": int,
             "target_group_id": str,
@@ -456,7 +470,7 @@ def run_health_check():
     # 7. Shopee - Address Validation
     log.info("Checking Shopee 'Address Validation' Configurations...")
     check_module_vars(
-        "shopee_scrapper.addressettings",
+        "config.addressettings",
         {
             "SOURCE_BOARD_ID": int,
             "TARGET_BOARD_ID": int,
@@ -471,9 +485,9 @@ def run_health_check():
     )
     # 6. Grab - Address Validation
     log.info("Checking Grab 'Address Validation' Configurations...")
-    check_module_vars("monday_checker.credentials", {"ACCOUNT_CREDS": dict})
+    check_module_vars("config.credentials_monday", {"ACCOUNT_CREDS": dict})
     check_module_vars(
-        "monday_checker.valsettings",
+        "config.valsettings_grab",
         {
             "SOURCE_BOARD_ID": int,
             "DESTINATION_BOARD_ID": int,
@@ -481,7 +495,7 @@ def run_health_check():
         },
     )
     check_module_vars(
-        "grab_scrapper.settings",
+        "config.settings_grab",
         {
             "GRAB_MERCHANT_CONFIG": dict,
             "MONDAY_TARGET_GROUP": list,

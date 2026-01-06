@@ -1,0 +1,51 @@
+import logging
+import os
+import sys
+from dotenv import load_dotenv
+
+# Add project root to path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, PROJECT_ROOT)
+
+# Import the shared watcher logic
+from modules.monday.automation.common_watcher import run_watcher_loop
+
+# --- Load Configuration from files ---
+load_dotenv()
+try:
+    from modules.monday.automation.config import dupsettings
+except ImportError:
+    print("FATAL: dupsettings.py file not found. Please create it.")
+    exit()
+
+# --- Global Settings ---
+POLL_INTERVAL_SECONDS = 60
+STATE_FILE = "monday_state_orderid.json"
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+
+# --- Main Watcher Logic ---
+def main():
+    """Sets up and runs the watcher for the Order ID board."""
+    run_watcher_loop(
+        board_id=dupsettings.MONDAY_BOARD_ID_ORDERID,
+        duplicate_checks=dupsettings.DUPLICATE_CHECKS_ORDERID,
+        target_group_id_val=getattr(
+            dupsettings, "MONDAY_TARGET_GROUP_ID_ORDERID", None
+        ),
+        target_group_name_val=getattr(
+            dupsettings, "MONDAY_TARGET_GROUP_NAME_ORDERID", ""
+        ),
+        state_file=STATE_FILE,
+        poll_interval=POLL_INTERVAL_SECONDS,
+        duplicate_label="Duplicate Alert!",
+        unique_label="",
+    )
+
+
+if __name__ == "__main__":
+    main()
