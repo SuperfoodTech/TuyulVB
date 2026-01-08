@@ -18,6 +18,7 @@ from common.logger import get_logger
 
 # Use the centralized logger
 log = get_logger("browser_session")
+log.propagate = False
 
 
 def human_like_typing(element, text):

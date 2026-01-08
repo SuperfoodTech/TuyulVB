@@ -15,7 +15,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from datetime import timezone, timedelta
 
-
 try:
     from modules.shopee.browser_session import BrowserSession
     from common.logger import get_logger
@@ -443,13 +442,6 @@ def upload_transactions_to_monday(board_id, group_id, transaction_data, portal_n
     log.info(
         f"Uploading {len(transaction_data)} transactions to Monday.com board '{board_id}'..."
     )
-
-    # --- TODO: DEFINE YOUR NEW MONDAY.COM COLUMN IDS ---
-    tx_id_column = "text_placeholder_txid"  # Column for Transaction ID
-    amount_column = "numbers_placeholder_amount"  # Column for Amount
-    cust_name_column = "text_placeholder_name"  # Column for Customer Name
-    cust_phone_column = "text_placeholder_phone"  # Column for Customer Phone
-    # ----------------------------------------------------
 
     log.info(
         f"    Fetching ALL existing items from group '{group_id}' (using pagination)..."
