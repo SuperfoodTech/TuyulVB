@@ -152,17 +152,11 @@ def validate_current_merchant(driver, expected_merchant_name: str) -> bool:
         else:
             # API unavailable - use proven UI-based validation instead
             log.debug(f"ℹ️  Using UI-based validation (API unavailable)")
-            # return validate_merchant_via_ui(driver, expected_merchant_name)
             log.warning("UI validation fallback is currently disabled by user request.")
             return False
 
     except Exception as e:
         log.error(f"❌ Merchant validation error: {e}")
-        # Last resort: try UI-based validation
-        # try:
-        #     return validate_merchant_via_ui(driver, expected_merchant_name)
-        # except:
-        #     return False
         return False
 
 

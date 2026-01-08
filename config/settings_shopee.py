@@ -31,11 +31,6 @@ MERCHANT_PROCESSING_LIST = [
         "validate_name": "SuperFood",
         "output_name": "Foodnesia",
     },
-    # {
-    #     "click_name": "Gurame Bakar, Do Eat",
-    #     "validate_name": "Gurame Bakar, Do Eat",
-    #     "output_name": "DoEat",
-    # },
     {
         "click_name": "WonderFood",
         "validate_name": "WonderFood",

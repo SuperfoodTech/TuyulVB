@@ -61,16 +61,13 @@ class EnvConfig:
         if not cls.MONDAY_API_KEY:
             errors.append("MONDAY_API_KEY is required but not set in .env")
 
-        if not cls.DISCORD_WEBHOOK_URL:
-            errors.append("DISCORD_WEBHOOK_URL is required but not set in .env")
-
         # Validate API key format (should have minimum length)
         if cls.MONDAY_API_KEY and len(cls.MONDAY_API_KEY) < 20:
             errors.append(
                 f"MONDAY_API_KEY appears invalid (too short: {len(cls.MONDAY_API_KEY)} chars)"
             )
 
-        # Validate webhook URL format
+        # Validate webhook URL format (only if provided)
         if cls.DISCORD_WEBHOOK_URL and not cls.DISCORD_WEBHOOK_URL.startswith(
             "https://"
         ):

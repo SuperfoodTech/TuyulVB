@@ -44,7 +44,7 @@ def fetch_board_items(board_id, group_id=None, limit=500):
     Returns:
         List of items or empty list if fetch fails
     """
-    log.info(f"Fetching items from board {board_id}...")
+    log.debug(f"Fetching items from board {board_id}...")
 
     if group_id:
         query = f"""
@@ -100,7 +100,7 @@ def fetch_board_items(board_id, group_id=None, limit=500):
         else:
             items = boards[0].get("items_page", {}).get("items", [])
 
-        log.info(f"Successfully fetched {len(items)} items from board {board_id}.")
+        log.debug(f"Successfully fetched {len(items)} items from board {board_id}.")
         return items
     except Exception as e:
         log.error(f"Failed to fetch items from board {board_id}: {e}")
