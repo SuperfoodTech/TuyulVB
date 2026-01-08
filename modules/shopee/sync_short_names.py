@@ -1,15 +1,12 @@
 import json
 import time
 import random
-import os
-import shutil
-import gzip
+import asyncio
+import requests
+import pandas as pd
 from datetime import datetime
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import pandas as pd
-import re
 
 try:
     # Assuming this script is run from the `shopee_scraper` directory
@@ -17,83 +14,155 @@ try:
 
     # Refactored to use common modules
     from common.monday_api import execute_monday_query
-    from common.shopee_utils import get_current_merchant_name, switch_merchant
-    from common.http_utils import parse_response_json
-    from config.credentials_shopee import ACCOUNT_CREDS
     from config.settings_shopee import (
         MERCHANT_PROCESSING_LIST,
         MONDAY_BOARD_ID,
         GROUP_MAPPING,
     )
-except ImportError:
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [FATAL] Ensure `credentials.py` and `settings.py` are created and configured."
-    )
+
+    # from modules.shopee.webshopee_api_client import WebShopeeAPIClient # REMOVED
+    from modules.shopee.api_utils import extract_tokens_from_driver, get_shopee_headers
+except ImportError as e:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [FATAL] Import error: {e}")
     exit()
 
+# API Configuration
+SHOPEE_API_BASE = "https://foody.shopee.co.id"
+API_TIMEOUT = 10
 
-# --- CORRECTED: Data collection with robust scrolling ---
-def collect_short_names(browser_session):
+
+def fetch_stores_via_api(tob_token, entity_id):
+    """Fetches all stores using the Shopee Partner API (Synchronous)."""
     all_stores = []
-    api_pattern = re.compile(
-        r"api\.partner\.shopee\.co\.id/nb/mss/web-api/PartnerServer/GetStoreList"
-    )
-    driver = browser_session.driver
-    wait = browser_session.wait
+
+    headers = get_shopee_headers(tob_token, entity_id)
+    page = 1
+    page_size = 50
+
+    log.info(f"🚀 Starting API collection of stores...")
+
+    while True:
+        log.info(f"  Fetching Page {page} (Size: {page_size})...")
+
+        payload = {"filter": {}, "page_no": page, "page_size": page_size}
+
+        try:
+            url = f"{SHOPEE_API_BASE}/api/seller/stores/search"
+            response = requests.post(
+                url, json=payload, headers=headers, timeout=API_TIMEOUT
+            )
+
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                log.error(f"  Failed to parse API response: {response.text[:100]}...")
+                break
+
+            if data.get("code") != 0:
+                if data.get("code") == 100002 and data.get("msg") == "mis svr err":
+                    log.warning(
+                        "  Encountered 'mis svr err' (Code 100002). Waiting 5 minutes before retrying..."
+                    )
+                    time.sleep(300)
+                    continue
+
+                log.error(f"  API Error: {data.get('msg')}")
+                break
+
+            # Extract list from nested structure
+            # Structure matches extract_raw.py: data -> data -> store_basic_info_list
+            store_list = data.get("data", {}).get("store_basic_info_list", [])
+
+            if not store_list:
+                log.info("  No more stores returned by API. Extraction complete.")
+                break
+
+            all_stores.extend(store_list)
+            log.info(f"  + {len(store_list)} stores. Total: {len(all_stores)}")
+
+            # Check if we've reached the end based on page size
+            if len(store_list) < page_size:
+                log.info("  Partial page received. Reached end of list.")
+                break
+
+            page += 1
+            time.sleep(random.uniform(0.5, 1.0))  # Polite delay
+
+        except requests.exceptions.RequestException as e:
+            log.error(f"  Network error during API call: {e}")
+            break
+        except Exception as e:
+            log.error(f"  Unexpected error: {e}")
+            break
+
+    return all_stores
+
+
+def collect_short_names(browser_session):
+    """
+    Collects short names using the Shopee Partner API.
+    Uses the browser session to get valid cookies.
+    """
     try:
-        # NEW: Ensure we are logged in before proceeding
+        # Ensure we are logged in before proceeding
         if not browser_session.ensure_logged_in():
             log.critical(
                 "  Failed to ensure login. Aborting collection for this merchant."
             )
             return None
 
-        log.info("  Navigating to the main dashboard...")
-        driver.get("https://partner.shopee.co.id/food/dashboard")
-        time.sleep(random.uniform(2, 4))
-        log.info("  Clicking the dropdown...")
-        del driver.requests
-        dropdown_trigger = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "div.ant-select-selector"))
-        )
-        dropdown_trigger.click()
-        scrollable_div = wait.until(
-            EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, 'div[style*="max-height: 300px"]')
-            )
-        )
+        log.info("  Extracting cookies for API access...")
+        tob_token, entity_id = extract_tokens_from_driver(browser_session.driver)
 
-        last_height = 0
-        while True:
-            driver.execute_script(
-                "arguments[0].scrollTop = arguments[0].scrollHeight", scrollable_div
-            )
-            log.info("  Scrolled down in the dropdown...")
-            time.sleep(2)
-            new_height = driver.execute_script(
-                "return arguments[0].scrollHeight", scrollable_div
-            )
-            if new_height == last_height:
-                log.info(
-                    "  Scroll height did not change. Reached the end of the list.",
-                )
-                break
-            last_height = new_height
+        if not tob_token or not entity_id:
+            log.warning("  Cookies not found immediately. Refreshing page to ensure cookies are loaded...")
+            browser_session.driver.refresh()
+            time.sleep(5)
+            tob_token, entity_id = extract_tokens_from_driver(browser_session.driver)
 
-        for request in driver.requests:
-            if api_pattern.search(request.url) and request.response:
-                response_json = parse_response_json(request.response)
-                if response_json:
-                    new_stores = response_json.get("data", {}).get("list", [])
-                    if new_stores:
-                        all_stores.extend(new_stores)
+        if not tob_token or not entity_id:
+            # Debugging: Log available cookies to understand why it failed
+            try:
+                available_cookies = [c.get('name') for c in browser_session.driver.get_cookies()]
+                log.debug(f"  Available cookies: {available_cookies}")
+            except Exception:
+                pass
+            
+            log.error(
+                "❌ Failed to find required authentication cookies (shopee_tob_token, shopee_tob_entity_id)."
+            )
+            return None
 
-        # The logger doesn't have a 'success' level by default, using 'info'
+        # Run the API fetch synchronously
+        # all_stores = asyncio.run(fetch_stores_via_api(tob_token, entity_id)) # REMOVED
+        all_stores = fetch_stores_via_api(tob_token, entity_id)
+
         log.info(f"✅ Total data collection complete. Found {len(all_stores)} stores.")
+
         if all_stores:
-            final_df = pd.DataFrame(all_stores).drop_duplicates(subset=["storeId"])
+            # Note: store_basic_info_list items have 'store_id' (snake_case) or 'storeId' (camelCase)?
+            # extract_raw.py just dumps it.
+            # Let's check the API response structure typically.
+            # The previous async code used `store.get("storeId")`.
+            # The NEW API endpoint used in extract_raw.py (api/seller/stores/search) might return snake_case keys like `store_id`.
+            # I will need to inspect the keys or handle both.
+            # Let's inspect the first item if available and normalize.
+
+            normalized_stores = []
+            for store in all_stores:
+                # Normalize key to 'storeId' and 'storeName' for downstream compatibility
+                s_id = store.get("store_id") or store.get("storeId")
+                s_name = store.get("store_name") or store.get("storeName")
+                if s_id:
+                    # Create a dict with keys expected by update_short_names_on_monday
+                    normalized_stores.append({"storeId": s_id, "storeName": s_name})
+
+            final_df = pd.DataFrame(normalized_stores).drop_duplicates(
+                subset=["storeId"]
+            )
             return final_df.to_dict("records")
         return []
+
     except Exception as e:
         log.error(f"  An unrecoverable error occurred during data collection: {e}")
         return None

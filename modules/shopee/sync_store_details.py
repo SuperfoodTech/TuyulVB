@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 
 try:
     # Assuming this script is run from the `shopee_scraper` directory
-    from modules.shopee.browser_session import log
+    from common.logger import get_logger
+    log = get_logger("store_details_sync")
 
     # Refactored to use common modules
     from common.monday_api import execute_monday_query
@@ -83,6 +84,56 @@ def _handle_stale_entries(board_id, existing_items_map, fresh_store_ids):
             time.sleep(1.5)  # Pause between batch requests to be safe
 
     log.info(f"  Finished processing {len(stale_store_ids)} stale entries.")
+
+
+def _process_update_batch(board_id, updates_list):
+    """
+    Updates existing items on Monday.com in batches to improve performance.
+    """
+    if not updates_list:
+        return
+
+    log.info(f"  Processing {len(updates_list)} items to update in batches...")
+
+    # Process in batches
+    batch_size = 30  # Safe batch size for complexity
+    for i in range(0, len(updates_list), batch_size):
+        batch = updates_list[i : i + batch_size]
+        log.info(
+            f"  Updating batch {i//batch_size + 1}/{(len(updates_list) + batch_size - 1)//batch_size} ({len(batch)} items)...",
+        )
+
+        mutation_parts = []
+        variable_definitions = ["$boardId: ID!"]
+        variables = {"boardId": int(board_id)}
+
+        for j, update_item in enumerate(batch):
+            item_id = update_item["item_id"]
+            col_vals = update_item["column_values"]
+
+            # Variable names
+            item_id_var = f"itemId{j}"
+            col_vals_var = f"colVals{j}"
+
+            # Definitions
+            variable_definitions.append(f"${item_id_var}: ID!")
+            variable_definitions.append(f"${col_vals_var}: JSON!")
+
+            # Mutation part
+            mutation_parts.append(
+                f"update_{j}: change_multiple_column_values(item_id: ${item_id_var}, board_id: $boardId, column_values: ${col_vals_var}) {{ id }}"
+            )
+
+            # Values
+            variables[item_id_var] = int(item_id)
+            variables[col_vals_var] = json.dumps(col_vals)
+
+        if mutation_parts:
+            full_mutation = f"mutation({', '.join(variable_definitions)}) {{ {' '.join(mutation_parts)} }}"
+            execute_monday_query(full_mutation, variables)
+            time.sleep(1.0)  # Rate limit protection
+
+    log.info("  Finished updating existing items.")
 
 
 def _check_busy_status_against_schedule(store_data):
@@ -202,6 +253,8 @@ def upload_to_monday(board_id, group_id, stores_data, portal_name):
         "fo_status_anomaly": 0,
     }
 
+    updates_list = []
+
     for i, store in enumerate(stores_data):
         # This loop now only focuses on creating/updating items present in the fresh data
         log.info(f"  Processing store {i+1}/{len(stores_data)}: {store.get('name')}")
@@ -248,15 +301,11 @@ def upload_to_monday(board_id, group_id, stores_data, portal_name):
 
         if store_id in existing_items_map:
             monday_item_id = int(existing_items_map[store_id]["id"])
-            log.info(f"     -> Updating existing item (ID: {monday_item_id})")
+            log.info(f"     -> Queued for update (ID: {monday_item_id})")
             column_values["name"] = item_name  # Add item name for update
-
-            mutation = "mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) { change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id } }"
-            variables = {
-                "itemId": monday_item_id,
-                "boardId": board_id,
-                "colVals": json.dumps(column_values),
-            }
+            updates_list.append(
+                {"item_id": monday_item_id, "column_values": column_values}
+            )
 
         else:
             log.info(f"    -> Creating new item for Store ID: {store_id}")
@@ -279,7 +328,11 @@ def upload_to_monday(board_id, group_id, stores_data, portal_name):
                     f"  Failed to upload item for Store ID {store_id}. Aborting process for this merchant.",
                 )
                 return
-        time.sleep(0.3)
+            time.sleep(0.3)
+
+    # Process batched updates
+    _process_update_batch(board_id, updates_list)
+
     board_name = get_board_name(board_id)
     log.info(f"✅ Monday.com board update complete for this merchant.")
 
