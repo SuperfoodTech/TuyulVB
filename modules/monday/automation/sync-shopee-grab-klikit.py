@@ -6,7 +6,7 @@ import sys
 import os
 
 # --- Setup Project Path ---
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
@@ -17,8 +17,8 @@ from common.config import EnvConfig, ConfigurationError
 from common.logging_config import LOG_FORMAT, DATE_FORMAT
 
 # --- Configuration ---
-log.basicConfig(level=log.INFO, format=LOG_FORMAT, datefmt=DATE_FORMAT)
-log = log.getLogger("sync_klikit")
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+log = logging.getLogger("sync_klikit")
 
 try:
     config = EnvConfig()
@@ -31,7 +31,7 @@ except ConfigurationError as e:
 
 
 CONFIG_FILE_PATH = os.path.join(
-    os.path.dirname(__file__), "config", "klikit_sync_config.json"
+    PROJECT_ROOT, "data", "cache", "klikit_sync_config.json"
 )
 
 

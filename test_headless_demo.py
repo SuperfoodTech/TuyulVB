@@ -30,7 +30,7 @@ def test_headless_vs_headed():
 
     title = driver.title
     print(f"   Page title: {title}")
-    print("   ✅ You should see a visible Chrome window")
+    print("   [OK] You should see a visible Chrome window")
 
     driver.quit()
     print("   Browser closed")
@@ -49,7 +49,7 @@ def test_headless_vs_headed():
 
     title = driver.title
     print(f"   Page title: {title}")
-    print("   ✅ No visible browser window - runs in background")
+    print("   [OK] No visible browser window - runs in background")
 
     driver.quit()
     print("   Browser closed")
