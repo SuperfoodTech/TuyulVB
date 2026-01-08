@@ -27,11 +27,11 @@ project_root = os.path.dirname(
 sys.path.insert(0, project_root)
 
 from common.logger import get_logger
-from common.http_utils import parse_response_json
 from common.monday_utils import fetch_board_items
 from dotenv import load_dotenv
 from common.notifications import send_discord_notification
 from modules.shopee.force_open.config_loader import load_config
+from modules.shopee.api_utils import extract_auth_tokens, get_shopee_headers
 
 log = get_logger("force_open")
 log.propagate = False
@@ -62,116 +62,6 @@ MAX_PARALLEL_STORES = 2  # Process stores in batches of 3 concurrently
 # ============================================================================
 
 
-def extract_tob_token_from_browser(driver):
-    """Extract tob_token cookie from browser (ONLY Selenium usage!).
-
-    This is the ONLY place Selenium is still used after refactoring.
-    Once authenticated, the token is used for all API calls.
-
-    IMPORTANT: Must navigate to the Shopee Food business hours settings page
-    to trigger the tob_token cookie creation.
-
-    Returns:
-        str: The tob_token if found, None otherwise
-    """
-    try:
-        log.debug("[EXTRACT] Extracting authentication token from browser cookies...")
-
-        # Navigate to Shopee Food business hours settings page
-        driver.get(
-            "https://partner.shopee.co.id/settings/shopee-food/business-hours-settings"
-        )
-
-        # Wait for page to fully load and cookies to be set (needs time for cookies)
-        time.sleep(10)
-        # Get all cookies and debug
-        all_cookies = driver.get_cookies()
-        cookie_names = [c["name"] for c in all_cookies]
-        log.debug(f"Available cookies: {cookie_names}")
-
-        # Extract tob_token (entity_id comes from Monday.com, not browser)
-        tob_token = None
-
-        for cookie in all_cookies:
-            cookie_name = cookie.get("name", "")
-
-            if cookie_name == "shopee_tob_token":
-                tob_token = cookie.get("value")
-                log.debug("[SUCCESS] tob_token extracted from shopee_tob_token cookie")
-                break
-
-        if tob_token:
-            return tob_token
-
-        # If we get here, no token found
-        log.error("[FAILED] tob_token not found in browser cookies")
-
-        # Try to check if browser is logged in
-        try:
-            page_source = driver.page_source
-            if "logout" in page_source.lower() or "sign out" in page_source.lower():
-                log.warning(
-                    "[WARNING] Browser appears to be logged in, but tob_token cookie not found"
-                )
-                log.warning("[RETRY] Retrying with refresh...")
-                # Refresh and wait for cookies to be set
-                driver.refresh()
-                time.sleep(8)
-                all_cookies = driver.get_cookies()
-
-                for cookie in all_cookies:
-                    if cookie.get("name") == "shopee_tob_token":
-                        tob_token = cookie.get("value")
-                        if tob_token:
-                            log.debug("[SUCCESS] tob_token found after refresh!")
-                            return tob_token
-            else:
-                log.error(
-                    "[WARNING] Browser does not appear to be logged in. Please authenticate first."
-                )
-        except Exception as check_error:
-            log.warning(f"[ERROR] Could not check login status: {check_error}")
-
-        return None
-    except Exception as e:
-        log.error(f"[FAILED] Failed to extract tob_token: {e}")
-        import traceback
-
-        log.debug(traceback.format_exc())
-        return None
-
-
-def _get_headers_food(tob_token: str, entity_id: str) -> dict:
-    """Generate headers for Shopee Food API requests.
-
-    Matches the pattern from webshopee_api_client.py
-
-    Args:
-        tob_token: Authentication token from cookie
-        entity_id: Shopee store/entity ID from Monday.com
-
-    Returns:
-        dict: HTTP headers for Shopee API
-    """
-    return {
-        "Host": "foody.shopee.co.id",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Content-Type": "application/json",
-        "Cookie": f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}",
-        "DNT": "1",
-        "Origin": "https://partner.shopee.co.id",
-        "Priority": "u=1, i",
-        "Referer": "https://partner.shopee.co.id/",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-site",
-        "X-Sf-Platform": "2",
-        "Operate-Source": "partnerapp",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-    }
-
-
 def process_store_via_api(store_data: dict, tob_token: str, entity_id: str) -> dict:
     """Process single store via direct API call (REPLACES all Selenium UI automation).
 
@@ -200,7 +90,7 @@ def process_store_via_api(store_data: dict, tob_token: str, entity_id: str) -> d
     action = store_data["action"]
     short_name = store_data["short_name"]
 
-    headers = _get_headers_food(tob_token, entity_id)
+    headers = get_shopee_headers(tob_token, entity_id)
 
     try:
         if action == "OPEN":
@@ -255,7 +145,7 @@ def get_store_status_via_api(
             'error': str (optional)
         }
     """
-    headers = _get_headers_food(tob_token, entity_id)
+    headers = get_shopee_headers(tob_token, entity_id)
 
     # Clean store name: strip whitespace
     clean_store_name = store_long_name.strip()
@@ -279,14 +169,33 @@ def get_store_status_via_api(
         if data.get("code") == 0:
             # API returns store_basic_info_list, not stores
             stores = data.get("data", {}).get("store_basic_info_list", [])
-            if stores:
-                store = stores[0]  # Get first matching store
-                display_status = store.get("display_status")
+
+            target_store = None
+
+            # 1. Try to find exact match by ID
+            for store in stores:
+                # Convert both to strings for comparison to be safe
+                if str(store.get("id")) == str(entity_id):
+                    target_store = store
+                    log.debug(f"[MATCH] Found store by ID: {entity_id}")
+                    break
+
+            # 2. If no ID match (or ID not provided), fallback to first result (risky but existing behavior)
+            # BUT we should prioritize the ID match if available.
+            if not target_store and stores:
+                log.warning(
+                    f"[WARNING] Store ID {entity_id} not found in search results. Using first result: {stores[0].get('name')} (ID: {stores[0].get('id')})"
+                )
+                target_store = stores[0]
+
+            if target_store:
+                display_status = target_store.get("display_status")
                 status_name = display_status_map.get(display_status, "Unknown")
-                found_store_name = store.get("name", "Unknown")
+                found_store_name = target_store.get("name", "Unknown")
+                found_store_id = target_store.get("id", "Unknown")
 
                 log.debug(
-                    f"[SUCCESS] Found store: '{found_store_name}' → Status: {status_name} ({display_status})"
+                    f"[SUCCESS] Found store: '{found_store_name}' (ID: {found_store_id}) → Status: {status_name} ({display_status})"
                 )
                 return {
                     "found": True,
@@ -313,19 +222,11 @@ def get_store_status_via_api(
 
 
 # ============================================================================
-# MONDAY.COM DATA FETCHING (UNCHANGED)
-# ============================================================================
-
-
-# Function get_monday_items removed in favor of common.monday_utils.fetch_board_items
-
-
-# ============================================================================
 # MAIN FUNCTION (REFACTORED - 90% SIMPLER)
 # ============================================================================
 
 
-def run_force_open(session, merchant_task, scale_level=1, dry_run=False):
+def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
     """
     REFACTORED: Uses direct API calls instead of Selenium UI automation.
 
@@ -342,12 +243,15 @@ def run_force_open(session, merchant_task, scale_level=1, dry_run=False):
     Args:
         session: BrowserSession object (used only for tob_token extraction)
         merchant_task: Dictionary with merchant info
-        scale_level: Priority level filter (1-5)
+        scale_level: Priority level filter (1-5). If None, uses value from config.
         dry_run: If True, simulate operations without making actual API calls
 
     Returns:
         dict: Statistics of operations performed
     """
+    if scale_level is None:
+        scale_level = config.get("SCALE_LEVEL", 1)
+
     log.info(f"Starting Force Open/Close Task. Scale Level: {scale_level}")
 
     # 1. Get merchant info & column IDs
@@ -413,7 +317,7 @@ def run_force_open(session, merchant_task, scale_level=1, dry_run=False):
 
     # Extract tob_token from current merchant context
     log.info("Extracting authentication from browser (business-hours-settings page)...")
-    tob_token = extract_tob_token_from_browser(session.driver)
+    tob_token, _ = extract_auth_tokens(session.driver)
 
     if not tob_token:
         log.error("Failed to extract tob_token. Cannot proceed.")
@@ -545,22 +449,36 @@ def run_force_open(session, merchant_task, scale_level=1, dry_run=False):
             )
 
         fields = []
-        categories = [
-            ("✅ Force Open", stats["forced_open"]),
-            ("❌ Force Close", stats["forced_close"]),
+
+        fields.append(
+            {
+                "name": f"✅ Force Open ({len(stats['forced_open'])})",
+                "value": format_field_value(stats["forced_open"]),
+                "inline": False,
+            }
+        )
+
+        fields.append(
+            {
+                "name": f"❌ Force Close ({len(stats['forced_close'])})",
+                "value": format_field_value(stats["forced_close"]),
+                "inline": False,
+            }
+        )
+
+        other_categories = [
             ("ℹ️ Already Open", stats["already_open"]),
             ("⏰ Closed in Regular Hours", stats["closed_in_regular_hours"]),
         ]
 
-        for emoji_name, items in categories:
-            if items:
-                fields.append(
-                    {
-                        "name": f"{emoji_name} ({len(items)})",
-                        "value": format_field_value(items),
-                        "inline": False,
-                    }
-                )
+        for emoji_name, items in other_categories:
+            fields.append(
+                {
+                    "name": f"{emoji_name} ({len(items)})",
+                    "value": format_field_value(items),
+                    "inline": False,
+                }
+            )
 
         send_discord_notification(
             DISCORD_WEBHOOK_URL,
