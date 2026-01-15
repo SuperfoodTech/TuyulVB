@@ -30,7 +30,7 @@ log = get_logger("run")
 #        for scripts that rely on relative paths for config files (like credentials.py).
 SCRIPTS = [
     {
-        "name": "Shopee: Extract Raw Store Data",
+        "name": "Shopee : Get Outlet Data",
         "path": os.path.join("modules", "shopee", "main_runner.py"),
         "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "extract_raw"],

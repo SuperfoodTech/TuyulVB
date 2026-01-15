@@ -6,6 +6,7 @@ Consolidates Monday API helper functions across all scripts.
 import json
 import time
 import logging
+from typing import List, Tuple
 from common.monday_api import execute_monday_query
 from common.logger import get_logger
 
@@ -122,6 +123,38 @@ def get_col_value(item: dict, column_id: str) -> str:
         if col.get("id") == column_id:
             return col.get("text", "")
     return ""
+
+
+def filter_items_by_check_level(
+    items: List[dict], check_col_id: str, scale_level: int
+) -> List[Tuple[dict, dict]]:
+    """Filter Monday.com items by the `check_col_id` value.
+
+    This implements the shared "Yes <level>" filtering logic used by
+    the force-open scheduler and runner. Returns a list of tuples
+    `(item, col_vals)` where `col_vals` maps column id -> text.
+    """
+    if not items:
+        return []
+
+    result: List[Tuple[dict, dict]] = []
+    for item in items:
+        col_vals = {
+            cv.get("id"): cv.get("text", "") for cv in item.get("column_values", [])
+        }
+
+        status_val = (col_vals.get(check_col_id) or "").strip()
+        if not status_val.startswith("Yes "):
+            continue
+
+        try:
+            level = int(status_val.split(" ")[1])
+            if level <= scale_level:
+                result.append((item, col_vals))
+        except (ValueError, IndexError):
+            continue
+
+    return result
 
 
 def get_all_items_from_group(board_id: int, group_id: str, column_ids: list) -> list:

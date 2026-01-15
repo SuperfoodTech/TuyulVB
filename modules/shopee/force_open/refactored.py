@@ -1,16 +1,3 @@
-"""
-🔄 REFACTORED force_open.py - Selenium Elimination Implementation
-
-Key Changes:
-✅ Removed all Selenium UI automation (95+ lines)
-✅ Direct API calls for open/close operations (20 lines)
-✅ Kept only tob_token extraction with Selenium (5 lines)
-✅ 92% performance improvement (25s → 2s per store)
-✅ 99% reliability (up from 85%)
-
-This file demonstrates the API-based approach described in SELENIUM_ELIMINATION_STRATEGY.md
-"""
-
 import re
 import os
 import sys
@@ -31,7 +18,12 @@ from common.monday_utils import fetch_board_items
 from dotenv import load_dotenv
 from common.notifications import send_discord_notification
 from modules.shopee.force_open.config_loader import load_config
-from modules.shopee.api_utils import extract_auth_tokens, get_shopee_headers
+from modules.shopee.api_utils import (
+    get_auth_tokens,
+    get_shopee_headers,
+)
+from modules.shopee.browser_session import BrowserSession
+from common.monday_utils import filter_items_by_check_level
 
 log = get_logger("force_open")
 log.propagate = False
@@ -54,39 +46,10 @@ SHOPEE_API_BASE = "https://foody.shopee.co.id"
 API_TIMEOUT = 5  # Reduced from 10s for faster timeouts
 RATE_LIMIT_DELAY_MIN = 0.3  # Reduced from 2s for faster processing
 RATE_LIMIT_DELAY_MAX = 0.7  # Reduced from 5s for faster processing
-MAX_PARALLEL_STORES = 2  # Process stores in batches of 3 concurrently
-
-
-# ============================================================================
-# REFACTORED HELPER FUNCTIONS (replacing 95+ lines of Selenium)
-# ============================================================================
+MAX_PARALLEL_STORES = 1
 
 
 def process_store_via_api(store_data: dict, tob_token: str, entity_id: str) -> dict:
-    """Process single store via direct API call (REPLACES all Selenium UI automation).
-
-    Previously, this required:
-    - Navigate to URL
-    - Search for store by name
-    - Click search button
-    - Wait for results
-    - Read UI status badge
-    - Click into store detail
-    - Click open/close button
-    - Handle confirmation dialogs
-    - Intercept API call
-    - Parse response
-
-    Now: Single direct API call (20 lines total)
-
-    Args:
-        store_data: Dictionary with 'action', 'store_id', 'short_name'
-        tob_token: Authentication token from browser
-        entity_id: Shopee store/entity ID from Monday.com
-
-    Returns:
-        dict: {'success': bool, 'action': str, 'error': str (optional)}
-    """
     action = store_data["action"]
     short_name = store_data["short_name"]
 
@@ -126,26 +89,13 @@ def process_store_via_api(store_data: dict, tob_token: str, entity_id: str) -> d
 
 
 def get_store_status_via_api(
-    store_long_name: str, tob_token: str, entity_id: str
+    store_long_name: str, tob_token: str, merchant_entity_id: str, target_store_id: str
 ) -> dict:
     """Fetch store status from Shopee API.
 
     Uses the store search endpoint to get the current display_status.
-
-    Args:
-        store_long_name: Full store name to search for
-        tob_token: Authentication token from browser
-        entity_id: Shopee store/entity ID from Monday.com
-
-    Returns:
-        dict: {
-            'found': bool,
-            'display_status': int (1=Closed, 2=Open, 3=Busy),
-            'display_status_name': str,
-            'error': str (optional)
-        }
     """
-    headers = get_shopee_headers(tob_token, entity_id)
+    headers = get_shopee_headers(tob_token, merchant_entity_id)
 
     # Clean store name: strip whitespace
     clean_store_name = store_long_name.strip()
@@ -167,24 +117,23 @@ def get_store_status_via_api(
         data = response.json()
 
         if data.get("code") == 0:
+            resp_data = data.get("data") or {}
+
             # API returns store_basic_info_list, not stores
-            stores = data.get("data", {}).get("store_basic_info_list", [])
-
+            stores = resp_data.get("store_basic_info_list", [])
             target_store = None
-
             # 1. Try to find exact match by ID
             for store in stores:
                 # Convert both to strings for comparison to be safe
-                if str(store.get("id")) == str(entity_id):
+                if str(store.get("id")) == str(target_store_id):
                     target_store = store
-                    log.debug(f"[MATCH] Found store by ID: {entity_id}")
+                    log.debug(f"[MATCH] Found store by ID: {target_store_id}")
                     break
 
-            # 2. If no ID match (or ID not provided), fallback to first result (risky but existing behavior)
-            # BUT we should prioritize the ID match if available.
+            # 2. If no ID match, fallback to first result
             if not target_store and stores:
                 log.warning(
-                    f"[WARNING] Store ID {entity_id} not found in search results. Using first result: {stores[0].get('name')} (ID: {stores[0].get('id')})"
+                    f"[WARNING] Store ID {target_store_id} not found in search results. Using first result: {stores[0].get('name')} (ID: {stores[0].get('id')})"
                 )
                 target_store = stores[0]
 
@@ -206,10 +155,8 @@ def get_store_status_via_api(
                 log.warning(
                     f"[NOT_FOUND] Store not found in search results: '{clean_store_name}'"
                 )
-                log.warning(
-                    f"[TIP] Check if the store name in Monday exactly matches Shopee's system"
-                )
-                log.debug(f"[DATA] Monday store name: '{store_long_name}'")
+                # Dump data to debug why list is empty
+                log.debug(f"[DEBUG_DATA] API Response Data: {str(resp_data)[:200]}")
                 return {"found": False, "error": "Store not found in search results"}
         else:
             error_msg = data.get("msg", "Unknown error")
@@ -218,36 +165,21 @@ def get_store_status_via_api(
 
     except Exception as e:
         log.error(f"[FAILED] Failed to get store status for '{clean_store_name}': {e}")
+        # Add traceback for deeper debugging if needed
+        import traceback
+
+        log.debug(traceback.format_exc())
         return {"found": False, "error": str(e)}
 
 
-# ============================================================================
-# MAIN FUNCTION (REFACTORED - 90% SIMPLER)
-# ============================================================================
+def run_force_open(
+    session, merchant_task, scale_level=None, dry_run=False, driver_creator=None
+):
+    """Run force-open/close using Shopee internal API (no Selenium UI flows).
 
-
-def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
-    """
-    REFACTORED: Uses direct API calls instead of Selenium UI automation.
-
-    Execution Flow:
-    1. ✅ Merchant switch validated (caller responsibility)
-    2. 🔐 Extract tob_token & entity_id from browser cookies
-       - Navigates to: https://partner.shopee.co.id/settings/shopee-food/business-hours-settings
-       - Waits for cookies to be set in current merchant context
-       - Extracts BOTH tob_token and entity_id (must match current merchant)
-    3. 📊 Fetch store data from Monday.com
-    4. 🔑 Use extracted token + entity_id for all API calls
-    5. 📤 Send Discord notification with results
-
-    Args:
-        session: BrowserSession object (used only for tob_token extraction)
-        merchant_task: Dictionary with merchant info
-        scale_level: Priority level filter (1-5). If None, uses value from config.
-        dry_run: If True, simulate operations without making actual API calls
-
-    Returns:
-        dict: Statistics of operations performed
+    - `session` is used only to extract browser cookies for auth tokens.
+    - `merchant_task` contains merchant mapping used to find Monday columns.
+    Returns a stats dictionary summarizing actions taken.
     """
     if scale_level is None:
         scale_level = config.get("SCALE_LEVEL", 1)
@@ -268,39 +200,30 @@ def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
     log.info(f"Fetching data from Monday.com for {merchant_name}...")
     items = fetch_board_items(MONDAY_BOARD_ID, GROUP_ID)
 
+    filtered = filter_items_by_check_level(items, CHECK_COL_ID, scale_level)
+
     stores_to_process = []
-    for item in items:
-        col_vals = {cv["id"]: cv["text"] for cv in item["column_values"]}
+    for item, col_vals in filtered:
+        s_long_name = col_vals.get(target_long_col_id) or ""
+        s_short_name = col_vals.get(target_short_col_id) or ""
+        s_store_id = col_vals.get(target_store_id_col_id) or ""
 
-        status_val = col_vals.get(CHECK_COL_ID) or ""
-        if not status_val.startswith("Yes "):
-            continue
+        if not s_short_name.strip():
+            s_short_name = s_long_name
 
-        try:
-            level = int(status_val.split(" ")[1])
-            if level <= scale_level:
-                s_long_name = col_vals.get(target_long_col_id) or ""
-                s_short_name = col_vals.get(target_short_col_id) or ""
-                s_store_id = col_vals.get(target_store_id_col_id) or ""  # NEW!
+        action = "OPEN"
+        if col_vals.get(CLOSED_REQ_COL_ID, "").strip() == "Closed":
+            action = "CLOSE"
 
-                if not s_short_name.strip():
-                    s_short_name = s_long_name
-
-                action = "OPEN"
-                if col_vals.get(CLOSED_REQ_COL_ID, "").strip() == "Closed":
-                    action = "CLOSE"
-
-                if s_long_name and s_store_id:  # Require store_id
-                    stores_to_process.append(
-                        {
-                            "long_name": s_long_name.strip(),
-                            "short_name": s_short_name.strip(),
-                            "store_id": s_store_id.strip(),  # NEW!
-                            "action": action,
-                        }
-                    )
-        except (IndexError, ValueError):
-            continue
+        if s_long_name and s_store_id:
+            stores_to_process.append(
+                {
+                    "long_name": s_long_name.strip(),
+                    "short_name": s_short_name.strip(),
+                    "store_id": s_store_id.strip(),
+                    "action": action,
+                }
+            )
 
     log.info(f"Found {len(stores_to_process)} stores to process")
 
@@ -314,23 +237,54 @@ def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
         "closed_in_regular_hours": [],
         "failed": [],
     }
-
-    # Extract tob_token from current merchant context
-    log.info("Extracting authentication from browser (business-hours-settings page)...")
-    tob_token, _ = extract_auth_tokens(session.driver)
+    tob_token, merchant_entity_id = get_auth_tokens(
+        driver=session.driver, merchant_name=merchant_name
+    )
+    if not tob_token:
+        log.warning(
+            "Initial token extraction failed. Trying fallback with temporary browser session..."
+        )
+        temp_session = None
+        try:
+            temp_session = BrowserSession(headless=False)
+            if temp_session.driver and temp_session.ensure_logged_in():
+                # Attempt extraction using the fresh driver and request JSON result (ensures save)
+                tokens = get_auth_tokens(
+                    driver=temp_session.driver,
+                    return_json=True,
+                    merchant_name=merchant_name,
+                )
+                if tokens and tokens.get("shopee_tob_token"):
+                    tob_token = tokens.get("shopee_tob_token")
+                    merchant_entity_id = tokens.get("shopee_tob_entity_id") or ""
+                    log.info("Fallback extraction succeeded and tokens saved to cache.")
+                else:
+                    log.error("Fallback extraction did not return tokens.")
+            else:
+                log.error("Fallback browser session initialization or login failed.")
+        except Exception as e:
+            log.error(f"Fallback extraction error: {e}")
+        finally:
+            if temp_session:
+                try:
+                    temp_session.quit()
+                except Exception:
+                    pass
 
     if not tob_token:
         log.error("Failed to extract tob_token. Cannot proceed.")
         return stats
 
-    log.info(f"Authentication successful")
-    log.debug(f"tob_token: {tob_token[:20]}...")
+    if not merchant_entity_id:
+        log.warning("Merchant entity_id not found. Search API might fail.")
+
+    log.info("Authentication successful")
+    log.debug(f"tob_token: {tob_token[:20]}... Merchant ID: {merchant_entity_id}")
 
     log.info(
         f"Processing {len(stores_to_process)} stores via API (batch size: {MAX_PARALLEL_STORES})..."
     )
 
-    # Use ThreadPoolExecutor for parallel processing
     import concurrent.futures
 
     def process_single_store(args):
@@ -340,14 +294,14 @@ def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
         short_name = store_data["short_name"]
         store_id = store_data["store_id"]
         monday_action = store_data["action"]
-        store_name_for_search = store_name.split(",")[0].strip()
+        store_name_for_search = store_name
 
         log.info(f"\n[{i+1}/{total}] Checking: {store_name} (Monday: {monday_action})")
         log.debug(f"Store ID: {store_id} | Short Name: {short_name}")
 
         try:
             status_result = get_store_status_via_api(
-                store_name_for_search, tob_token, store_id
+                store_name_for_search, tob_token, merchant_entity_id, store_id
             )
 
             if not status_result.get("found"):
@@ -425,8 +379,7 @@ def run_force_open(session, merchant_task, scale_level=None, dry_run=False):
             elif status_type == "failed":
                 stats["failed"].append(item_name)
 
-            # Small delay between parallel batch completions
-            time.sleep(random.uniform(RATE_LIMIT_DELAY_MIN, RATE_LIMIT_DELAY_MAX))
+                time.sleep(random.uniform(RATE_LIMIT_DELAY_MIN, RATE_LIMIT_DELAY_MAX))
 
     # Send Discord notification only if there are forced opens/closes
     if stats["forced_open"] or stats["forced_close"]:

@@ -32,16 +32,17 @@ from config.settings_shopee import MERCHANT_PROCESSING_LIST
 from modules.shopee.force_open.refactored import run_force_open
 from modules.shopee.force_open.config_loader import load_config
 from common.shopee_utils import switch_merchant
+from common.monday_utils import filter_items_by_check_level
 
 log = get_logger("force_open_scheduler")
 log.propagate = False
 
 # Load configuration from config.json
 config = load_config()
-INTERVAL_MINUTES = config.get("INTERVAL_MINUTES", 15)
-SCALE_LEVEL = config.get("SCALE_LEVEL", 1)
-DRY_RUN = config.get("DRY_RUN", False)
-HEADLESS_MODE = config.get("HEADLESS_MODE", True)
+INTERVAL_MINUTES = config.get("INTERVAL_MINUTES")
+SCALE_LEVEL = config.get("SCALE_LEVEL")
+DRY_RUN = config.get("DRY_RUN")
+HEADLESS_MODE = config.get("HEADLESS_MODE")
 
 STATE_FILE_PATH = os.path.join(PROJECT_ROOT, "data", "cache", "force_open_state.json")
 
@@ -52,13 +53,13 @@ class ForceOpenScheduler:
         self.merchants = MERCHANT_PROCESSING_LIST
         self.run_count = 0
         self.is_running = False
-        
+
         # Monday.com Config for Monitoring
         self.monday_board_id = config.get("MONDAY_BOARD_ID")
         self.group_id = config.get("GROUP_ID")
         self.check_col_id = config.get("CHECK_COL_ID")
         self.closed_req_col_id = config.get("CLOSED_REQ_COL_ID")
-        
+
         # State Cache: {item_id: closed_req_value}
         self.state_cache = self._load_state()
 
@@ -72,7 +73,7 @@ class ForceOpenScheduler:
         """Load state from JSON file."""
         if os.path.exists(STATE_FILE_PATH):
             try:
-                with open(STATE_FILE_PATH, 'r') as f:
+                with open(STATE_FILE_PATH, "r") as f:
                     state = json.load(f)
                 log.info(f"Loaded previous state from {STATE_FILE_PATH}")
                 return state
@@ -83,7 +84,7 @@ class ForceOpenScheduler:
     def _save_state(self):
         """Save current state to JSON file."""
         try:
-            with open(STATE_FILE_PATH, 'w') as f:
+            with open(STATE_FILE_PATH, "w") as f:
                 json.dump(self.state_cache, f, indent=4)
             log.debug(f"State saved to {STATE_FILE_PATH}")
         except Exception as e:
@@ -106,6 +107,20 @@ class ForceOpenScheduler:
                 return False
 
         return True
+
+    def _driver_creator(self):
+        """Factory that returns a logged-in BrowserSession object for token extraction.
+
+        Returns a BrowserSession instance (not the raw webdriver). `get_or_create_auth_tokens`
+        understands this and will extract `driver` from it and call `quit()` on the session.
+        """
+        sess = BrowserSession(headless=HEADLESS_MODE)
+        try:
+            if sess.driver and sess.ensure_logged_in():
+                return sess
+        except Exception:
+            pass
+        return sess
 
     def _login_master_account(self):
         """Login with the first (master) account."""
@@ -143,24 +158,15 @@ class ForceOpenScheduler:
             if not items:
                 return None  # Distinguish empty from error if possible, but fetch_board_items returns [] on error too.
 
+            # Use shared filter helper to apply the "Yes <level>" criteria
             current_state = {}
-            for item in items:
-                col_vals = {cv["id"]: cv["text"] for cv in item["column_values"]}
+            filtered = filter_items_by_check_level(
+                items, self.check_col_id, SCALE_LEVEL
+            )
+            for item, col_vals in filtered:
+                req_val = col_vals.get(self.closed_req_col_id, "").strip()
+                current_state[item["id"]] = req_val
 
-                # Apply same filtering as refactored.py
-                status_val = col_vals.get(self.check_col_id) or ""
-                if not status_val.startswith("Yes "):
-                    continue
-
-                try:
-                    level = int(status_val.split(" ")[1])
-                    if level <= SCALE_LEVEL:
-                        # Track the value of the request column (Open/Closed/Empty)
-                        req_val = col_vals.get(self.closed_req_col_id, "").strip()
-                        current_state[item["id"]] = req_val
-                except (ValueError, IndexError):
-                    continue
-            
             return current_state
         except Exception as e:
             log.error(f"Error fetching Monday state: {e}")
@@ -181,7 +187,7 @@ class ForceOpenScheduler:
         if current_state is None:
             log.warning("Failed to fetch Monday state during poll. Skipping.")
             return
-        
+
         # If this is the first successful fetch, just populate cache and wait
         if not self.state_cache:
             self.state_cache = current_state
@@ -189,25 +195,29 @@ class ForceOpenScheduler:
             return
 
         changes_detected = False
-        
+
         # Check for modified or new items
         for item_id, new_val in current_state.items():
             old_val = self.state_cache.get(item_id)
-            
+
             if item_id not in self.state_cache:
                 log.info(f"🆕 New item detected (ID: {item_id}). Triggering run.")
                 changes_detected = True
                 break
             elif old_val != new_val:
-                log.info(f"🔄 Status change detected for Item {item_id}: '{old_val}' -> '{new_val}'. Triggering run.")
+                log.info(
+                    f"🔄 Status change detected for Item {item_id}: '{old_val}' -> '{new_val}'. Triggering run."
+                )
                 changes_detected = True
                 break
-        
+
         # Check for removed items (optional: might not need immediate run, but we must update cache)
         if not changes_detected:
             if len(current_state) != len(self.state_cache):
                 # An item was disabled or deleted. Just update cache, no need to trigger run (nothing to update on Shopee)
-                log.info(f"Item count changed ({len(self.state_cache)} -> {len(current_state)}). Updating cache.")
+                log.info(
+                    f"Item count changed ({len(self.state_cache)} -> {len(current_state)}). Updating cache."
+                )
                 self.state_cache = current_state
                 self._save_state()
                 return
@@ -215,7 +225,7 @@ class ForceOpenScheduler:
         if changes_detected:
             log.info("⚡ Immediate execution triggered by Monday.com changes!")
             self.run_all_merchants()
-        
+
         # Update cache is handled inside run_all_merchants, but if we didn't run, we should update here?
         # Actually, if we trigger run_all_merchants, it updates the cache at the end.
         # If we DON'T trigger, we should update cache here to reflect silent drops (disabled items).
@@ -240,7 +250,9 @@ class ForceOpenScheduler:
 
             # Initialize session if not already done
             if not self.initialize_session():
-                log.error("Cannot proceed without valid session. Retrying on next interval.")
+                log.error(
+                    "Cannot proceed without valid session. Retrying on next interval."
+                )
                 return
 
             for i, merchant_task in enumerate(self.merchants, 1):
@@ -249,10 +261,14 @@ class ForceOpenScheduler:
 
                 try:
                     if not self.session.ensure_logged_in():
-                        log.error(f"Failed to ensure login before switching to {merchant_name}. Skipping.")
+                        log.error(
+                            f"Failed to ensure login before switching to {merchant_name}. Skipping."
+                        )
                         continue
 
-                    if not switch_merchant(self.session.driver, self.session.wait, merchant_task):
+                    if not switch_merchant(
+                        self.session.driver, self.session.wait, merchant_task
+                    ):
                         log.error(f"Failed to switch to {merchant_name}. Skipping.")
                         continue
 
@@ -261,6 +277,7 @@ class ForceOpenScheduler:
                         merchant_task=merchant_task,
                         scale_level=SCALE_LEVEL,
                         dry_run=DRY_RUN,
+                        driver_creator=self._driver_creator,
                     )
                     log.info(f"✅ Completed: {merchant_name}")
 
@@ -269,15 +286,19 @@ class ForceOpenScheduler:
                     # Attempt session recovery
                     if self.session and self.session.driver:
                         try:
-                            self.session.driver.get("https://partner.shopee.co.id/food/dashboard")
+                            self.session.driver.get(
+                                "https://partner.shopee.co.id/food/dashboard"
+                            )
                         except:
                             self.close_session()
                     continue
-                
+
                 time.sleep(2)
 
             log.info("=" * 80)
-            log.info(f"Run #{self.run_count} completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            log.info(
+                f"Run #{self.run_count} completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
             log.info("=" * 80)
 
             # Update state cache immediately after run to prevent re-triggering
@@ -297,7 +318,7 @@ class ForceOpenScheduler:
         log.info(f"1. Regular Interval: Every {INTERVAL_MINUTES} minutes")
         log.info(f"2. Change Monitor: Every 1 minute (Immediate Trigger)")
         log.info("Press Ctrl+C to stop.")
-        
+
         # Populate initial cache
         log.info("Populating initial state cache...")
         initial_state = self.get_monitoring_state()
@@ -316,7 +337,7 @@ class ForceOpenScheduler:
         try:
             while True:
                 schedule.run_pending()
-                time.sleep(5) 
+                time.sleep(5)
         except KeyboardInterrupt:
             log.info("\n⏹️  Scheduler stopped by user.")
             self.close_session()

@@ -25,8 +25,6 @@ STATE_FILE = "monday_state_ssot.json"
 # --- Logging Configuration ---
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
-
 
 # --- Main Watcher Logic ---
 
