@@ -36,6 +36,11 @@ MERCHANT_PROCESSING_LIST = [
         "validate_name": "WonderFood",
         "output_name": "WonderFood",
     },
+    {
+        "click_name": "Gurame Bakar, Do Eat",
+        "validate_name": "Gurame Bakar, Do Eat",
+        "output_name": "DoEat",
+    },
     {"click_name": "LOKARASA", "validate_name": "LOKARASA", "output_name": "Lokarasa"},
 ]
 

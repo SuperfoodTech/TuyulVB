@@ -41,7 +41,7 @@ def request_interceptor(request):
 
 
 class BrowserSession:
-    def __init__(self, headless=False):
+    def __init__(self, headless=True):
         log.info("🚀 Initializing stealth browser session...")
         try:
             options = webdriver.ChromeOptions()
