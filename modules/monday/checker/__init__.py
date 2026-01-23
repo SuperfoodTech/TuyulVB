@@ -1,0 +1,1 @@
+# Monday Checker module

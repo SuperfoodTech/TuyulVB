@@ -1,0 +1,21 @@
+# .gitignore
+
+# Ignore Python cache files
+__pycache__/
+
+# Ignore files containing sensitive credentials
+.gitignore
+*.json
+selenium_profiles/
+*.xlsx
+credentials_grab.py
+credentials_shopee.py
+.env
+sample.txt
+debug.log
+debug_html/
+debug_screenshots/
+raw_data/
+raw_grab_data/
+webshopee_api_client.py
+sample_menu.txt

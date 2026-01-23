@@ -1,0 +1,25 @@
+# For web scraping and browser automation
+selenium
+selenium-wire
+webdriver-manager
+
+# For data manipulation
+pandas
+openpyxl  # Required by pandas for reading/writing .xlsx files
+
+# For making API requests to Monday.com
+requests
+
+# For loading environment variables from .env files
+python-dotenv
+
+# For progress bars in console applications
+tqdm
+openpyxl
+
+# For scheduling tasks
+schedule
+
+# For Async API Client
+aiohttp
+cachetools
