@@ -24,6 +24,32 @@ GROUP_MAPPING = {
     "FM1": "group_mkw4cg1g",
 }
 
+# ============================================================================
+# MERCHANT PROCESSING / MONDAY MAPPING CONFIGURATION
+# ============================================================================
+# Configuration for which merchants are processed and how they map to Monday
+#
+# Purpose:
+#   - `MERCHANT_PROCESSING_LIST`: Defines the merchant profiles the runner will
+#     iterate over when performing Shopee tasks.
+#   - `GROUP_MAPPING`: Maps `output_name` values from the processing list to the
+#     corresponding Monday.com group IDs where results will be written.
+#   - `MONDAY_BOARD_ID`: The target Monday.com board where groups are located.
+#
+# Environment Variables (optional support patterns):
+#   - SHOPEE_MERCHANTS_JSON: Path to an alternate merchant list JSON (if implemented)
+#     How used: Tooling may load merchants from a file instead of hardcoding.
+#     Purpose: Allow dynamic merchant lists in CI or different environments.
+#   - MONDAY_BOARD_ID: If set as an env var, it should override the hardcoded board ID.
+#     Purpose: Deploy to different Monday boards without changing the code.
+#
+# Used By: `modules/shopee/main_runner.py` and task modules invoked by it
+#   - The runner reads `MERCHANT_PROCESSING_LIST` to display the menu and
+#     determine which merchants to run tasks for.
+#   - `GROUP_MAPPING` is used when writing results to Monday to select the
+#     correct group on the board identified by `MONDAY_BOARD_ID`.
+# ============================================================================
+
 # The list of merchants to process under the master account.
 MERCHANT_PROCESSING_LIST = [
     {
@@ -36,11 +62,11 @@ MERCHANT_PROCESSING_LIST = [
         "validate_name": "WonderFood",
         "output_name": "WonderFood",
     },
-    {
-        "click_name": "Gurame Bakar, Do Eat",
-        "validate_name": "Gurame Bakar, Do Eat",
-        "output_name": "DoEat",
-    },
+    # {
+    #     "click_name": "Gurame Bakar, Do Eat",
+    #     "validate_name": "Gurame Bakar, Do Eat",
+    #     "output_name": "DoEat",
+    # },
     {"click_name": "LOKARASA", "validate_name": "LOKARASA", "output_name": "Lokarasa"},
 ]
 

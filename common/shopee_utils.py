@@ -8,6 +8,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 from common.logger import get_logger
 from common.http_utils import parse_response_json
+from modules.shopee.api_utils import get_auth_tokens
 
 # Use the centralized logger
 log = get_logger("shopee_utils")
@@ -21,59 +22,87 @@ GET_STORE_LIST_ENDPOINT = f"{PARTNER_API_BASE}/PartnerServer/GetStoreList"
 API_TIMEOUT = 10
 
 
-def get_current_merchant_via_api(driver):
-    """Get current merchant info via API (NO UI DEPENDENCY!).
-
-    Uses the Partner API to retrieve merchant information.
-    This executes a fetch() call inside the browser context, ensuring
-    perfect header/cookie alignment with the active session.
-
-    Args:
-        driver: Selenium WebDriver instance
-
-    Returns:
-        dict: Merchant info including merchantName, merchantId, store_id
-        None: If API call fails
-    """
+def get_current_merchant_via_api(driver, extra_headers: dict = None):
     try:
         log.info("📡 Fetching current merchant info via API (browser context)...")
 
         # Give browser a moment to load/settle
-        time.sleep(2)
+        time.sleep(3)
 
         # JavaScript to execute fetch in the browser context
-        # This bypasses the need to manually reconstruct headers/cookies in Python
+        # Try multiple endpoints and methods, include credentials so cookies are sent,
+        # and allow optional custom headers and POST body (useful to force GetUserInfo).
         fetch_script = """
         var callback = arguments[arguments.length - 1];
-        var url = arguments[0];
-        
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-                // Cookies are automatically sent by the browser
-            },
-            body: '{}'
-        })
-        .then(response => {
-            if (!response.ok) {
-                callback({error: 'HTTP error ' + response.status});
-                return;
+        var endpoints = arguments[0];
+
+        function safeFetch(url, options) {
+            // Append timestamp to prevent caching
+            var cleanUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_ts=' + new Date().getTime();
+            return fetch(cleanUrl, options)
+            .then(function(response) {
+                if (!response.ok) {
+                    return {__fetch_error: 'HTTP ' + response.status, status: response.status};
+                }
+                return response.json().catch(function(e){ return {__fetch_error: 'invalid_json:'+e.toString()}; });
+            })
+            .catch(function(err) {
+                return {__fetch_error: err.toString()};
+            });
+        }
+
+        (async function(){
+            var lastError = null;
+            for (var i = 0; i < endpoints.length; i++){
+                var entry = endpoints[i];
+                var url = entry.url;
+                var methods = entry.methods || ['POST','GET'];
+                var headerOverrides = entry.headers || {};
+                for (var m = 0; m < methods.length; m++){
+                    var method = methods[m];
+                    var opts = {
+                        method: method,
+                        headers: Object.assign({'Accept': 'application/json', 'Content-Type': 'application/json'}, headerOverrides),
+                        credentials: 'include',
+                        cache: 'no-store'
+                    };
+                    // For POST send an empty JSON body to emulate the curl sample
+                    if (method === 'POST') {
+                        opts.body = JSON.stringify(entry.body || {});
+                    }
+
+                    var res = await safeFetch(url, opts);
+                    if (res && !res.__fetch_error){
+                        callback({url: url, method: method, payload: res});
+                        return;
+                    }
+                    lastError = {url: url, method: method, error: res && res.__fetch_error};
+                }
             }
-            return response.json();
-        })
-        .then(data => callback(data))
-        .catch(error => callback({error: error.toString()}));
+            callback({error: 'all_attempts_failed', lastError: lastError});
+        })();
         """
 
         # Execute the script
         try:
             # Set a script timeout just in case
-            driver.set_script_timeout(15)
-            response_data = driver.execute_async_script(
-                fetch_script, GET_USER_INFO_ENDPOINT
-            )
+            driver.set_script_timeout(20)
+            # Prefer POST first (matches provided curl) and include any extra headers requested
+            endpoints = [
+                {
+                    "url": GET_USER_INFO_ENDPOINT,
+                    "methods": ["POST", "GET"],
+                    "headers": (extra_headers or {}),
+                    "body": {},
+                },
+                {
+                    "url": GET_STORE_LIST_ENDPOINT,
+                    "methods": ["POST", "GET"],
+                    "headers": (extra_headers or {}),
+                    "body": {},
+                },
+            ]
+            response_data = driver.execute_async_script(fetch_script, endpoints)
         except Exception as e:
             log.error(f"Failed to execute fetch script: {e}")
             return None
@@ -86,12 +115,21 @@ def get_current_merchant_via_api(driver):
             return None
 
         if "error" in response_data:
-            log.warning(f"API fetch error: {response_data['error']}")
+            log.warning(
+                f"API fetch error: {response_data.get('error')} lastError={response_data.get('lastError')}"
+            )
             return None
 
-        # Parse response
-        data = response_data
-        if data.get("errorCode") == 0 and "data" in data:
+        # Parse response payload returned by the browser fetch script
+        data = response_data.get("payload") if isinstance(response_data, dict) else None
+        # If payload not present, maybe the script returned the JSON directly
+        if (
+            data is None
+            and isinstance(response_data, dict)
+            and "payload" not in response_data
+        ):
+            data = response_data
+        if isinstance(data, dict) and data.get("errorCode") == 0 and "data" in data:
             merchant_info = data["data"]
             merchant_name = merchant_info.get("merchantName")
             merchant_id = merchant_info.get("merchantId")
@@ -107,8 +145,26 @@ def get_current_merchant_via_api(driver):
                 "full_response": merchant_info,
             }
         else:
-            error_code = data.get("errorCode")
-            error_msg = data.get("errorMsg", "Unknown error")
+            # Try to be forgiving: sometimes the endpoint may return the merchant object directly
+            if isinstance(data, dict) and any(
+                k in data for k in ("merchantName", "merchantId")
+            ):
+                merchant_name = data.get("merchantName")
+                merchant_id = data.get("merchantId")
+                store_id = data.get("store_id") or data.get("storeId")
+                return {
+                    "merchantName": merchant_name,
+                    "merchantId": merchant_id,
+                    "store_id": store_id,
+                    "full_response": data,
+                }
+
+            error_code = data.get("errorCode") if isinstance(data, dict) else None
+            error_msg = (
+                data.get("errorMsg", "Unknown error")
+                if isinstance(data, dict)
+                else str(data)
+            )
             log.debug(f"API returned error (code {error_code}): {error_msg}")
             return None
 
@@ -118,30 +174,35 @@ def get_current_merchant_via_api(driver):
 
 
 def validate_current_merchant(driver, expected_merchant_name: str) -> bool:
-    """Validate that the current merchant matches the expected one.
-
-    Attempts API validation first, but falls back to proven UI-based validation
-    if API is unavailable (Partner API GetUserInfo endpoint doesn't exist yet).
-
-    Args:
-        driver: Selenium WebDriver instance
-        expected_merchant_name: The merchant name to validate against
-
-    Returns:
-        bool: True if current merchant matches expected, False otherwise
-    """
     try:
         log.info(f"🔍 Validating merchant: {expected_merchant_name}")
 
-        # Try API first (will likely return None since endpoint doesn't exist)
-        current_merchant = get_current_merchant_via_api(driver)
+        # Prefer an active POST probe to the GetUserInfo endpoint and use
+        # get_auth_tokens to attach headers extracted from the browser session.
+        tob_token, entity_id = get_auth_tokens(driver)
+
+        probe_headers = None
+        if tob_token:
+            probe_headers = {
+                "content-type": "application/json",
+                "origin": "https://partner.shopee.co.id",
+                "referer": "https://partner.shopee.co.id/",
+                # attach merchant token so the active probe uses the same auth
+                "x-merchant-token": tob_token,
+            }
+            if entity_id:
+                probe_headers["x-merchant-from"] = str(entity_id)
+
+        # Perform active probe via browser fetch (POST preferred inside helper)
+        current_merchant = get_current_merchant_via_api(
+            driver, extra_headers=probe_headers
+        )
 
         if current_merchant is not None:
-            # API worked! Use it
             actual_name = current_merchant.get("merchantName", "").strip()
             expected_clean = expected_merchant_name.strip()
 
-            if actual_name == expected_clean:
+            if actual_name.lower() == expected_clean.lower():
                 log.info(f"✅ Merchant validation passed (via API): {actual_name}")
                 return True
             else:
@@ -149,51 +210,19 @@ def validate_current_merchant(driver, expected_merchant_name: str) -> bool:
                     f"❌ Merchant mismatch! Expected: {expected_clean}, Got: {actual_name}"
                 )
                 return False
-        else:
-            # API unavailable - use proven UI-based validation instead
-            log.debug(f"ℹ️  Using UI-based validation (API unavailable)")
-            log.warning("UI validation fallback is currently disabled by user request.")
-            return False
 
+        # If API probe returned nothing, do not attempt UI validation here.
+        log.debug(
+            "API probe returned no result; merchant could not be validated via API"
+        )
+        return False
     except Exception as e:
         log.error(f"❌ Merchant validation error: {e}")
         return False
 
 
-def validate_merchant_via_ui(driver, expected_merchant_name: str) -> bool:
-    """Fallback: Validate merchant using UI elements (less reliable but proven to work).
-
-    Args:
-        driver: Selenium WebDriver
-        expected_merchant_name: Expected merchant name
-
-    Returns:
-        bool: True if merchant name matches
-    """
-    try:
-        log.info(f"🔍 Validating merchant via UI: {expected_merchant_name}")
-        # Wait for the merchant name element
-        wait = WebDriverWait(driver, 5)
-        name_element = wait.until(
-            EC.visibility_of_element_located((By.XPATH, "//div[@class='merchantName']"))
-        )
-        actual_name = name_element.text.strip()
-
-        if actual_name == expected_merchant_name.strip():
-            log.info(f"✅ Merchant validation passed (via UI): {actual_name}")
-            return True
-        else:
-            log.error(
-                f"❌ Merchant mismatch! Expected: {expected_merchant_name}, Got: {actual_name}"
-            )
-            return False
-
-    except TimeoutException:
-        log.warning(f"⚠️  Could not find merchant name element on page")
-        return False
-    except Exception as e:
-        log.error(f"❌ UI validation failed: {e}")
-        return False
+# Note: UI-based merchant validation removed — the code now relies on
+# API-based validation via `get_current_merchant_via_api`.
 
 
 def get_current_merchant_name(driver, wait: WebDriverWait):
@@ -245,10 +274,10 @@ def switch_merchant(driver, wait: WebDriverWait, merchant_info: dict):
             )
         )
 
-        # Clear requests BEFORE clicking to ensure we catch the NEW request
-        try:
+        # Clear previous requests to ensure we capture fresh ones
+        if hasattr(driver, "requests"):
             del driver.requests
-        except AttributeError:
+        else:
             log.debug(
                 "Driver does not support requests interception (not selenium-wire)."
             )
@@ -257,19 +286,53 @@ def switch_merchant(driver, wait: WebDriverWait, merchant_info: dict):
         log.info("  Validating merchant switch...")
         wait.until(EC.url_contains("https://partner.shopee.co.id/food/dashboard"))
 
-        # --- Validation: Intercept GetUserInfo response ---
-        # This mirrors the logic in force_open.py
+        # Start listening immediately, don't sleep for 10s
         user_info_pattern = re.compile(r"PartnerAccountServer/GetUserInfo")
-        max_retries = 10  # 10 * 1s = 10s timeout
+        max_retries = 5  # Poll for only 5 seconds (Fast Path)
 
         for i in range(max_retries):
             try:
-                # Check requests in reverse order (newest first)
+                # Check requests in reverse order (newest first).
                 if hasattr(driver, "requests"):
-                    for request in reversed(driver.requests):
-                        if request.url and user_info_pattern.search(request.url):
-                            if request.response and request.response.body:
-                                data = parse_response_json(request.response)
+                    # Since we cleared requests before click, all requests are new
+                    requests_snapshot = list(driver.requests)
+
+                    found_any_match = False
+                    for request in reversed(requests_snapshot):
+                        try:
+                            if request.url and user_info_pattern.search(request.url):
+                                found_any_match = True
+                                # Ensure response is available
+                                resp = getattr(request, "response", None)
+                                if not resp:
+                                    log.debug(
+                                        f"Matched URL but no response yet: {request.url}"
+                                    )
+                                    continue
+
+                                # Log status code and body presence for diagnosis
+                                status = getattr(resp, "status_code", None) or getattr(
+                                    resp, "status", None
+                                )
+                                body = getattr(resp, "body", None)
+                                body_len = len(body) if body is not None else 0
+
+                                log.debug(
+                                    f"Matched GetUserInfo response: status={status}, body_len={body_len}"
+                                )
+
+                                if body_len == 0:
+                                    # Response present but empty body — skip
+                                    log.debug(
+                                        "Response body empty, continuing to next request."
+                                    )
+                                    continue
+
+                                try:
+                                    data = parse_response_json(resp)
+                                except Exception as e:
+                                    log.debug(f"Failed to parse response JSON: {e}")
+                                    data = None
 
                                 # Validate content
                                 if (
@@ -284,38 +347,93 @@ def switch_merchant(driver, wait: WebDriverWait, merchant_info: dict):
                                         "validate_name"
                                     ].strip()
 
-                                    if actual_name == expected_name:
+                                    # Case-insensitive comparison
+                                    if actual_name.lower() == expected_name.lower():
                                         log.info(
-                                            f"✅ Successfully switched to: {expected_name}."
+                                            f"✅ Successfully switched to: {expected_name} (Captured Network Event)."
                                         )
+                                        # Extract and cache tokens once for callers to reuse
+                                        try:
+                                            tob_token, entity_id = get_auth_tokens(
+                                                driver
+                                            )
+                                            driver._shopee_auth = {
+                                                "tob_token": tob_token,
+                                                "entity_id": entity_id,
+                                            }
+                                        except Exception:
+                                            # don't fail the switch if caching tokens fails
+                                            driver._shopee_auth = {
+                                                "tob_token": None,
+                                                "entity_id": None,
+                                            }
                                         return True
                                     else:
-                                        # Use debug instead of error here, as we might have caught an old request
-                                        # or a transitionary state if we weren't careful.
                                         log.debug(
-                                            f"  Captured merchant: {actual_name}, Expected: {expected_name}"
+                                            f"Captured merchant: '{actual_name}', Expected: '{expected_name}' (Mismatch)"
                                         )
+                                        # Keep looking in case there's a newer request
+                                        continue
+                        except Exception as inner_e:
+                            log.debug(f"Error inspecting specific request: {inner_e}")
+
+                else:
+                    log.debug(
+                        "Driver has no 'requests' attribute; cannot inspect network requests."
+                    )
             except Exception as e:
-                log.debug(f"  Error inspecting network requests: {e}")
+                log.debug(f"Error inspecting network requests: {e}")
 
             time.sleep(1)
 
-        log.warning(
-            "⚠️  Network interception timed out or failed. Falling back to active probe..."
+        # Retrieve captured URLs for debugging context
+        captured_urls = []
+        if hasattr(driver, "requests"):
+            captured_urls = [r.url for r in list(driver.requests)[-5:]]  # Last 5 URLs
+
+        log.info(
+            f"ℹ️  Network event not captured (might be cached). Last URLs: {captured_urls}"
         )
+        log.info("👉 Triggering Active API Probe for validation...")
 
         # --- Fallback: Active Probe (Fetch) ---
-        # If we missed the network event, use the robust fetch method we added earlier
-        if validate_current_merchant(driver, merchant_info["validate_name"]):
-            log.info(
-                f"✅ Successfully switched to {merchant_info['validate_name']} (Verified via Probe)."
-            )
-            return True
+        # If we missed the network event, actively POST to the GetUserInfo endpoint
+        probe_headers = {
+            "content-type": "application/json",
+            "origin": "https://partner.shopee.co.id",
+            "referer": "https://partner.shopee.co.id/",
+        }
+        # Attach x-merchant-token from browser session using central extractor
+        tob_token, entity_id = get_auth_tokens(driver)
+        if tob_token:
+            probe_headers["x-merchant-token"] = tob_token
+        # Prefer including the merchant/store id as x-merchant-from when available
+        if merchant_info.get("store_id"):
+            probe_headers["x-merchant-from"] = str(merchant_info.get("store_id"))
+        elif merchant_info.get("merchantId"):
+            probe_headers["x-merchant-from"] = str(merchant_info.get("merchantId"))
 
-        log.error(
-            f"❌ Failed to confirm switch to {merchant_info['validate_name']} via API after retries."
-        )
-        return False
+        probe_resp = get_current_merchant_via_api(driver, extra_headers=probe_headers)
+        if probe_resp is not None:
+            actual_name = probe_resp.get("merchantName", "").strip()
+            expected_name = merchant_info["validate_name"].strip()
+            if actual_name.lower() == expected_name.lower():
+                log.info(
+                    f"✅ Successfully switched to {expected_name} (Verified via Active Probe)."
+                )
+                # Cache tokens on the driver so callers can reuse and avoid re-extraction
+                try:
+                    driver._shopee_auth = {
+                        "tob_token": tob_token,
+                        "entity_id": entity_id,
+                    }
+                except Exception:
+                    driver._shopee_auth = {"tob_token": None, "entity_id": None}
+                return True
+            else:
+                log.debug(
+                    f"Active probe returned merchant '{actual_name}' (expected '{expected_name}')."
+                )
     except (TimeoutException, NoSuchElementException) as e:
         log.error(
             f"❌ Failed to switch to merchant {merchant_info['validate_name']}. Details: {e}",

@@ -18,14 +18,26 @@ SHOPEE_API_BASE = "https://foody.shopee.co.id"
 API_TIMEOUT = 5
 
 
-def get_shopee_headers(tob_token: str, entity_id: str) -> dict:
+def get_shopee_headers(tob_token: str, entity_id: str, base_cookies_dict: dict = None) -> dict:
     """Generate headers for Shopee Food API requests."""
+    
+    if base_cookies_dict:
+        # Use provided cookies and update specific auth fields
+        cookies = base_cookies_dict.copy()
+        cookies["shopee_tob_entity_id"] = entity_id
+        cookies["shopee_tob_token"] = tob_token
+        
+        cookie_header = "; ".join([f"{k}={v}" for k, v in cookies.items()])
+    else:
+        # Fallback to minimal cookies
+        cookie_header = f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}"
+
     return {
         "Host": "foody.shopee.co.id",
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
         "Content-Type": "application/json",
-        "Cookie": f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}",
+        "Cookie": cookie_header,
         "DNT": "1",
         "Origin": "https://partner.shopee.co.id",
         "Priority": "u=1, i",
@@ -85,6 +97,13 @@ def extract_tokens_from_driver(driver) -> Tuple[Optional[str], Optional[str]]:
     return tob_token, entity_id
 
 
+def get_cookies_dict(driver) -> dict:
+    """Extract all cookies from the driver as a dictionary."""
+    if not driver:
+        return {}
+    return {c['name']: c['value'] for c in driver.get_cookies()}
+
+
 def get_auth_tokens(driver, merchant_name: str = None, return_json: bool = False):
     """Extract fresh authentication tokens from an active webdriver session.
 
@@ -141,6 +160,3 @@ def get_auth_tokens(driver, merchant_name: str = None, return_json: bool = False
     if return_json:
         return None
     return None, None
-
-
-extract_auth_tokens = get_auth_tokens

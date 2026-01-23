@@ -13,6 +13,7 @@ from seleniumwire import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from config.credentials_shopee import ACCOUNT_CREDS
 from selenium.webdriver.chrome.service import Service
+from types import SimpleNamespace
 import time
 from common.logger import get_logger
 
@@ -31,10 +32,10 @@ def human_like_typing(element, text):
 def request_interceptor(request):
     """A custom interceptor to log only the requests relevant for data extraction."""
     api_endpoints_to_log = [
-        "api/seller/stores/search",
-        "PartnerServer/GetStoreList",
-        "PartnerTransactionServer/GetTransactionList",
-        "api/seller/mis/orders/",
+        # "api/seller/stores/search",
+        # "PartnerServer/GetStoreList",
+        # "PartnerTransactionServer/GetTransactionList",
+        # "api/seller/mis/orders/",
     ]
     if any(endpoint in request.url for endpoint in api_endpoints_to_log):
         log.info(f"Intercepted data request: {request.url}")
@@ -59,13 +60,88 @@ class BrowserSession:
                 "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             )
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            profile_path = os.path.join(
-                script_dir, "selenium_profiles", "shopee_profile"
-            )
+            base_profiles_dir = os.path.join(script_dir, "selenium_profiles")
+            profile_name = os.environ.get("SHOPEE_SELENIUM_PROFILE", "shopee_profile")
+            profile_path = os.path.join(base_profiles_dir, profile_name)
+            os.makedirs(profile_path, exist_ok=True)
+            profile_path = os.path.abspath(profile_path)
             options.add_argument(f"--user-data-dir={profile_path}")
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()), options=options
+            # Also provide a profile-directory name to be explicit
+            options.add_argument(f"--profile-directory={profile_name}")
+            # Disable browser-side caching to avoid stale data and minimize disk usage
+            options.add_argument("--disable-application-cache")
+            options.add_argument("--disk-cache-size=0")
+            # Configure selenium-wire / mitmproxy options to improve stability
+            # Use an object (SimpleNamespace) because some selenium-wire
+            # internals access option attributes rather than dict keys.
+            seleniumwire_options = SimpleNamespace(
+                verify_ssl=False,  # don't verify Shopee's cert via mitmproxy
+                suppress_connection_errors=True,  # hide handshake failures
+                disable_encoding=True,  # prevent gzip/encoding issues
+                mitm_http2=False,  # CRITICAL: force HTTP/1.1 (disable HTTP/2)
             )
+            # Try to construct a selenium-wire options object if available
+            SWOptionsClass = None
+            try:
+                # selenium-wire exposed options class may live in different modules
+                from seleniumwire.options import SeleniumWireOptions as SWOptionsClass  # type: ignore
+            except Exception:
+                try:
+                    from seleniumwire.utils import SeleniumWireOptions as SWOptionsClass  # type: ignore
+                except Exception:
+                    SWOptionsClass = None
+
+            driver_init_error = None
+            # Attempt 1: use SeleniumWireOptions class if available
+            if SWOptionsClass:
+                try:
+                    sw_opts = SWOptionsClass(
+                        {
+                            "verify_ssl": False,
+                            "suppress_connection_errors": True,
+                            "disable_encoding": True,
+                            "mitm_http2": False,
+                        }
+                    )
+                    log.info("Initializing Chrome with SeleniumWireOptions instance")
+                    self.driver = webdriver.Chrome(
+                        service=Service(ChromeDriverManager().install()),
+                        options=options,
+                        seleniumwire_options=sw_opts,
+                    )
+                except Exception as e:
+                    driver_init_error = e
+
+            # Attempt 2: fallback to passing a plain dict (recommended by selenium-wire docs)
+            if not getattr(self, "driver", None):
+                try:
+                    self.driver = webdriver.Chrome(
+                        service=Service(ChromeDriverManager().install()),
+                        options=options,
+                        seleniumwire_options={
+                            "verify_ssl": False,
+                            "suppress_connection_errors": True,
+                            "disable_encoding": True,
+                            "mitm_http2": False,
+                        },
+                    )
+                except Exception as e:
+                    driver_init_error = e
+
+            # Attempt 3: as a last resort, initialize plain selenium webdriver (no selenium-wire)
+            if not getattr(self, "driver", None):
+                try:
+                    from selenium import webdriver as plain_webdriver  # type: ignore
+
+                    self.driver = plain_webdriver.Chrome(
+                        service=Service(ChromeDriverManager().install()),
+                        options=options,
+                    )
+                except Exception as e:
+                    driver_init_error = e
+
+            if not getattr(self, "driver", None) and driver_init_error:
+                raise driver_init_error
 
             # Set the custom interceptor to filter logs
             self.driver.request_interceptor = request_interceptor

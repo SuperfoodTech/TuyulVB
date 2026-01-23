@@ -5,6 +5,7 @@ Consolidates gzip decompression and JSON parsing logic across all scripts.
 
 import gzip
 import json
+import brotli
 from common.logger import get_logger
 
 log = get_logger("http_utils")
@@ -23,20 +24,29 @@ def decompress_response_body(response, is_gzipped=None):
     """
     try:
         body_bytes = response.body if hasattr(response, "body") else response
+        encoding = None
 
-        # Determine if gzipped
-        if is_gzipped is None and hasattr(response, "headers"):
-            is_gzipped = response.headers.get("Content-Encoding") == "gzip"
-        else:
-            is_gzipped = is_gzipped or False
-
-        # Decompress if needed
+        # Determine encoding from headers if available
+        if hasattr(response, "headers"):
+            content_encoding = response.headers.get("Content-Encoding", "").lower()
+            if "gzip" in content_encoding:
+                encoding = "gzip"
+            elif "br" in content_encoding:
+                encoding = "br"
+        
+        # Override if is_gzipped flag is explicitly set (legacy support)
         if is_gzipped:
+            encoding = "gzip"
+
+        # Decompress based on encoding
+        if encoding == "gzip":
             body_bytes = gzip.decompress(body_bytes)
+        elif encoding == "br":
+            body_bytes = brotli.decompress(body_bytes)
 
         return body_bytes.decode("utf-8")
-    except (gzip.BadGzipFile, EOFError) as e:
-        log.error(f"Failed to decompress gzip: {e}")
+    except (gzip.BadGzipFile, brotli.error, EOFError) as e:
+        log.error(f"Failed to decompress ({encoding}): {e}")
         return None
     except UnicodeDecodeError as e:
         log.error(f"Failed to decode response: {e}")

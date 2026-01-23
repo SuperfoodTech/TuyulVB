@@ -164,7 +164,24 @@ class ForceOpenScheduler:
                 items, self.check_col_id, SCALE_LEVEL
             )
             for item, col_vals in filtered:
-                req_val = col_vals.get(self.closed_req_col_id, "").strip()
+                try:
+                    if col_vals and isinstance(col_vals, dict):
+                        raw_val = col_vals.get(self.closed_req_col_id)
+                    else:
+                        raw_val = None
+
+                    if raw_val is None:
+                        req_val = ""
+                    elif isinstance(raw_val, str):
+                        req_val = raw_val.strip()
+                    else:
+                        # Convert other types to string and trim
+                        req_val = str(raw_val).strip()
+
+                except Exception as e:
+                    log.debug(f"Unexpected column value for item {item.get('id')}: {e}")
+                    req_val = ""
+
                 current_state[item["id"]] = req_val
 
             return current_state
