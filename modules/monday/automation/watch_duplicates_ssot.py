@@ -4,7 +4,9 @@ import sys
 from dotenv import load_dotenv
 
 # Add project root to path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 sys.path.insert(0, PROJECT_ROOT)
 
 # Import the shared watcher logic
@@ -20,12 +22,12 @@ except ImportError:
 
 # --- Global Settings ---
 POLL_INTERVAL_SECONDS = 60
-STATE_FILE = "monday_state_ssot.json"
+STATE_FILE = os.path.join(PROJECT_ROOT, "data", "cache", "monday_state_ssot.json")
 
 # --- Logging Configuration ---
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-
+)
 # --- Main Watcher Logic ---
 
 
@@ -34,10 +36,11 @@ def main():
     run_watcher_loop(
         board_id=dupsettings.MONDAY_BOARD_ID_SSOT,
         duplicate_checks=dupsettings.DUPLICATE_CHECKS_SSOT,
-        target_group_id_val=getattr(dupsettings, "MONDAY_TARGET_GROUP_ID_SSOT", None),
+        target_group_id_val=getattr(dupsettings, "MONDAY_TARGET_GROUP_ID_SSOT", ""),
         target_group_name_val=getattr(dupsettings, "MONDAY_TARGET_GROUP_NAME_SSOT", ""),
         state_file=STATE_FILE,
         poll_interval=POLL_INTERVAL_SECONDS,
+        duplicate_label="Duplicate {count}x",
     )
 
 

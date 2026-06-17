@@ -222,6 +222,7 @@ def run_force_open(
                     "short_name": s_short_name.strip(),
                     "store_id": s_store_id.strip(),
                     "action": action,
+                    "scale_level_str": col_vals.get(CHECK_COL_ID, "").strip(),
                 }
             )
 
@@ -294,6 +295,7 @@ def run_force_open(
         short_name = store_data["short_name"]
         store_id = store_data["store_id"]
         monday_action = store_data["action"]
+        scale_level_str = store_data.get("scale_level_str", "Unknown")
         store_name_for_search = store_name
 
         log.info(f"\n[{i+1}/{total}] Checking: {store_name} (Monday: {monday_action})")
@@ -306,7 +308,7 @@ def run_force_open(
 
             if not status_result.get("found"):
                 log.error(f"Could not fetch store status. Skipping.")
-                return ("failed", store_name)
+                return ("failed", store_name, scale_level_str)
 
             actual_status = status_result.get("display_status")
             action_to_take = None
@@ -314,10 +316,10 @@ def run_force_open(
             if monday_action == "OPEN":
                 if actual_status == 1:
                     log.info(f"{store_name} is Closed (operational hours). No action.")
-                    return ("closed_in_regular_hours", short_name)
+                    return ("closed_in_regular_hours", short_name, scale_level_str)
                 elif actual_status == 2:
                     log.info(f"{store_name} is already Open. No action.")
-                    return ("already_open", short_name)
+                    return ("already_open", short_name, scale_level_str)
                 elif actual_status == 3:
                     action_to_take = "OPEN"
                     log.info(f"{store_name} is Busy. Will force OPEN.")
@@ -325,13 +327,13 @@ def run_force_open(
             elif monday_action == "CLOSE":
                 if actual_status == 1:
                     log.info(f"{store_name} is Closed (operational hours). No action.")
-                    return ("closed_in_regular_hours", short_name)
+                    return ("closed_in_regular_hours", short_name, scale_level_str)
                 elif actual_status == 2:
                     action_to_take = "CLOSE"
                     log.info(f"{store_name} is Open. Will force CLOSE.")
                 elif actual_status == 3:
                     log.info(f"{store_name} is already closed. No action.")
-                    return ("closed_in_regular_hours", short_name)
+                    return ("closed_in_regular_hours", short_name, scale_level_str)
 
             if action_to_take and not dry_run:
                 result = process_store_via_api(
@@ -340,19 +342,27 @@ def run_force_open(
                     entity_id=store_id,
                 )
                 if result["success"]:
-                    return (f"forced_{action_to_take.lower()}", short_name)
+                    return (
+                        f"forced_{action_to_take.lower()}",
+                        short_name,
+                        scale_level_str,
+                    )
                 else:
                     log.error(f"{store_name} - {result.get('error')}")
-                    return ("failed", store_name)
+                    return ("failed", store_name, scale_level_str)
             elif action_to_take and dry_run:
                 log.info(f"[DRY_RUN] Would {action_to_take}")
-                return (f"forced_{action_to_take.lower()}", f"{short_name} (DRY_RUN)")
+                return (
+                    f"forced_{action_to_take.lower()}",
+                    f"{short_name} (DRY_RUN)",
+                    scale_level_str,
+                )
 
-            return ("no_action", short_name)
+            return ("no_action", short_name, scale_level_str)
 
         except Exception as e:
             log.error(f"Error: {e}")
-            return ("failed", store_name)
+            return ("failed", store_name, scale_level_str)
 
     # Process stores in parallel batches
     with concurrent.futures.ThreadPoolExecutor(
@@ -366,18 +376,18 @@ def run_force_open(
         for future in concurrent.futures.as_completed(
             [executor.submit(process_single_store, task) for task in tasks]
         ):
-            status_type, item_name = future.result()
+            status_type, item_name, item_level = future.result()
 
             if status_type == "forced_open":
-                stats["forced_open"].append(item_name)
+                stats["forced_open"].append((item_name, item_level))
             elif status_type == "forced_close":
-                stats["forced_close"].append(item_name)
+                stats["forced_close"].append((item_name, item_level))
             elif status_type == "already_open":
-                stats["already_open"].append(item_name)
+                stats["already_open"].append((item_name, item_level))
             elif status_type == "closed_in_regular_hours":
-                stats["closed_in_regular_hours"].append(item_name)
+                stats["closed_in_regular_hours"].append((item_name, item_level))
             elif status_type == "failed":
-                stats["failed"].append(item_name)
+                stats["failed"].append((item_name, item_level))
 
                 time.sleep(random.uniform(RATE_LIMIT_DELAY_MIN, RATE_LIMIT_DELAY_MAX))
 
@@ -390,16 +400,30 @@ def run_force_open(
             f"**Total Processed:** {len(stores_to_process)}\n"
         )
 
-        def format_field_value(items, max_items=15):
-            if not items:
+        def format_field_value(items_with_level, max_chars=1000):
+            if not items_with_level:
                 return "None"
-            if len(items) <= max_items:
-                return "\n".join([f"- {item}" for item in items])
-            remaining = len(items) - max_items
-            return (
-                "\n".join([f"- {item}" for item in items[:max_items]])
-                + f"\n... and {remaining} more"
-            )
+
+            # Group by level
+            grouped = {}
+            for name, level in items_with_level:
+                if level not in grouped:
+                    grouped[level] = []
+                grouped[level].append(name)
+
+            # Sort levels (Yes 1, Yes 2, ...)
+            sorted_levels = sorted(grouped.keys())
+
+            lines = []
+            for level in sorted_levels:
+                stores = grouped[level]
+                store_str = ", ".join(stores)
+                lines.append(f"{level}: {store_str}")
+
+            full_text = "\n".join(lines)
+            if len(full_text) > max_chars:
+                return full_text[: max_chars - 3] + "..."
+            return full_text
 
         fields = []
 

@@ -18,19 +18,23 @@ SHOPEE_API_BASE = "https://foody.shopee.co.id"
 API_TIMEOUT = 5
 
 
-def get_shopee_headers(tob_token: str, entity_id: str, base_cookies_dict: dict = None) -> dict:
+def get_shopee_headers(
+    tob_token: str, entity_id: str, base_cookies_dict: dict = None
+) -> dict:
     """Generate headers for Shopee Food API requests."""
-    
+
     if base_cookies_dict:
         # Use provided cookies and update specific auth fields
         cookies = base_cookies_dict.copy()
         cookies["shopee_tob_entity_id"] = entity_id
         cookies["shopee_tob_token"] = tob_token
-        
+
         cookie_header = "; ".join([f"{k}={v}" for k, v in cookies.items()])
     else:
         # Fallback to minimal cookies
-        cookie_header = f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}"
+        cookie_header = (
+            f"shopee_tob_entity_id={entity_id}; shopee_tob_token={tob_token}"
+        )
 
     return {
         "Host": "foody.shopee.co.id",
@@ -101,7 +105,7 @@ def get_cookies_dict(driver) -> dict:
     """Extract all cookies from the driver as a dictionary."""
     if not driver:
         return {}
-    return {c['name']: c['value'] for c in driver.get_cookies()}
+    return {c["name"]: c["value"] for c in driver.get_cookies()}
 
 
 def get_auth_tokens(driver, merchant_name: str = None, return_json: bool = False):
@@ -117,8 +121,6 @@ def get_auth_tokens(driver, merchant_name: str = None, return_json: bool = False
         return None, None
 
     log.info("Extracting authentication tokens from browser...")
-
-    # Ensure we're on the business hours page where the cookie is usually set
     try:
         if "business-hours-settings" not in driver.current_url:
             driver.get(

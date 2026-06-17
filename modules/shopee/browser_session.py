@@ -44,6 +44,7 @@ def request_interceptor(request):
 class BrowserSession:
     def __init__(self, headless=True):
         log.info("🚀 Initializing stealth browser session...")
+        self.headless = headless
         try:
             options = webdriver.ChromeOptions()
             options.add_argument("--log-level=3")
@@ -189,47 +190,89 @@ class BrowserSession:
                 # If we are on a login page, perform the login.
                 if "/login" in self.driver.current_url:
                     log.info("  ➡️ Beginning human-like login interaction...")
-                    username_field = self.wait.until(
-                        EC.visibility_of_element_located(
-                            (
-                                By.CSS_SELECTOR,
-                                'input[placeholder="No. handphone / Username / Email"]',
+
+                    if creds.get("phone"):
+                        log.info(f"  Login using Phone Number: {creds.get('phone')}")
+                        # Click 'Log in dengan no. HP'
+                        log.info("  Clicking 'Log in dengan no. HP' link...")
+                        phone_login_link = self.wait.until(
+                            EC.element_to_be_clickable(
+                                (
+                                    By.XPATH,
+                                    "//a[contains(text(), 'Log in dengan no. HP')]",
+                                )
                             )
                         )
-                    )
-                    password_field = self.wait.until(
-                        EC.visibility_of_element_located(
-                            (By.CSS_SELECTOR, 'input[placeholder="Password"]')
+                        phone_login_link.click()
+                        time.sleep(random.uniform(1.0, 2.0))
+
+                        # Input Phone
+                        log.info("  Entering phone number...")
+                        phone_input = self.wait.until(
+                            EC.visibility_of_element_located(
+                                (By.CSS_SELECTOR, "input[type='tel']")
+                            )
                         )
-                    )
-                    ActionChains(self.driver).move_to_element(
-                        username_field
-                    ).click().perform()
-                    time.sleep(random.uniform(0.5, 1.0))
-                    username_field.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE)
-                    human_like_typing(username_field, creds["username"])
-                    time.sleep(random.uniform(0.8, 1.5))
-                    ActionChains(self.driver).move_to_element(
-                        password_field
-                    ).click().perform()
-                    password_field.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE)
-                    human_like_typing(password_field, creds["password"])
-                    time.sleep(random.uniform(1.0, 2.0))
-                    self.wait.until(
-                        EC.element_to_be_clickable(
-                            (By.XPATH, "//button[contains(., 'Masuk')]")
-                        )
-                    ).click()
-                    try:
-                        time.sleep(random.uniform(0.5, 1.2))
-                        WebDriverWait(self.driver, 5).until(
+                        ActionChains(self.driver).move_to_element(
+                            phone_input
+                        ).click().perform()
+                        time.sleep(random.uniform(0.5, 1.0))
+                        # phone_input.clear() # Sometimes clear() triggers validation errors if empty, use with caution or backspace
+                        phone_input.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE)
+                        human_like_typing(phone_input, creds["phone"])
+                        time.sleep(random.uniform(0.8, 1.5))
+
+                        # Click 'Selanjutnya'
+                        log.info("  Clicking 'Selanjutnya'...")
+                        next_button = self.wait.until(
                             EC.element_to_be_clickable(
-                                (By.XPATH, "//button[contains(., 'Lanjutkan')]")
+                                (By.XPATH, "//button[contains(., 'Selanjutnya')]")
+                            )
+                        )
+                        next_button.click()
+
+                    else:
+                        username_field = self.wait.until(
+                            EC.visibility_of_element_located(
+                                (
+                                    By.CSS_SELECTOR,
+                                    'input[placeholder="No. handphone / Username / Email"]',
+                                )
+                            )
+                        )
+                        password_field = self.wait.until(
+                            EC.visibility_of_element_located(
+                                (By.CSS_SELECTOR, 'input[placeholder="Password"]')
+                            )
+                        )
+                        ActionChains(self.driver).move_to_element(
+                            username_field
+                        ).click().perform()
+                        time.sleep(random.uniform(0.5, 1.0))
+                        username_field.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE)
+                        human_like_typing(username_field, creds["username"])
+                        time.sleep(random.uniform(0.8, 1.5))
+                        ActionChains(self.driver).move_to_element(
+                            password_field
+                        ).click().perform()
+                        password_field.send_keys(Keys.CONTROL + "a", Keys.BACKSPACE)
+                        human_like_typing(password_field, creds["password"])
+                        time.sleep(random.uniform(1.0, 2.0))
+                        self.wait.until(
+                            EC.element_to_be_clickable(
+                                (By.XPATH, "//button[contains(., 'Masuk')]")
                             )
                         ).click()
-                        log.info("  ➡️ Clicked optional 'Continue' button.")
-                    except TimeoutException:
-                        pass
+                        try:
+                            time.sleep(random.uniform(0.5, 1.2))
+                            WebDriverWait(self.driver, 5).until(
+                                EC.element_to_be_clickable(
+                                    (By.XPATH, "//button[contains(., 'Lanjutkan')]")
+                                )
+                            ).click()
+                            log.info("  ➡️ Clicked optional 'Continue' button.")
+                        except TimeoutException:
+                            pass
 
             log.info("  Waiting for post-login page to settle...")
             time.sleep(random.uniform(3.0, 5.0))

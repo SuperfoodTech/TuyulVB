@@ -11,6 +11,8 @@ import requests
 import random
 from datetime import datetime
 from common.logger import get_logger
+from common.notifications import send_discord_notification
+from common.config import EnvConfig
 from collections import OrderedDict
 import uuid
 from requests.adapters import HTTPAdapter
@@ -122,7 +124,6 @@ def fetch_monday_state(board_id, group_id, merchant_name):
         log.warning(f"  Failed to save Monday state dump: {e}")
 
     return items_map
-
 
 def sync_extracted_data_to_monday(json_path, merchant_name):
     """
@@ -593,6 +594,58 @@ def collect_shopee_raw_data(browser_session, merchant_name):
 
             # Trigger Sync
             sync_extracted_data_to_monday(filepath, merchant_name)
+
+            # --- Discord Notification ---
+            try:
+                total_tasks = len(all_stores)
+                
+                # Status counts (1: Inactive, 2: Active)
+                active_count = sum(1 for s in all_stores if s.get("status") == 2)
+                inactive_count = sum(1 for s in all_stores if s.get("status") == 1)
+                
+                # Display status counts (1: Closed, 2: Open, 3: Busy)
+                open_count = sum(1 for s in all_stores if s.get("display_status") == 2)
+                busy_count = sum(1 for s in all_stores if s.get("display_status") == 3)
+                closed_count = sum(1 for s in all_stores if s.get("display_status") == 1)
+
+                fields = [
+                    {
+                        "name": "Channel",
+                        "value": "ShopeeFood",
+                        "inline": True
+                    },
+                    {
+                        "name": "Portal",
+                        "value": merchant_name,
+                        "inline": True
+                    },
+                    {
+                        "name": "Total Tasks",
+                        "value": str(total_tasks),
+                        "inline": True
+                    },
+                    {
+                        "name": "📊 Outlet Status",
+                        "value": f"🟢 Active: {active_count}\n🔴 Inactive: {inactive_count}",
+                        "inline": False
+                    },
+                    {
+                        "name": "📊 OFD Status",
+                        "value": f"🟢 Open: {open_count}\n🟡 Busy: {busy_count}\n🔴 Closed: {closed_count}",
+                        "inline": False
+                    }
+                ]
+
+                webhook_url = EnvConfig.DISCORD_WEBHOOK_URL
+                if webhook_url:
+                    send_discord_notification(
+                        webhook_url=webhook_url,
+                        title="Activity: Shopee - Pull Data - Outlet Counter",
+                        description="Objective: Count total outlets per portal and label their status",
+                        fields=fields
+                    )
+            except Exception as e:
+                log.error(f"Failed to send Discord notification: {e}")
 
             return filepath
         except Exception as e:

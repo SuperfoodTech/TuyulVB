@@ -38,6 +38,7 @@ try:
         run_unified_sync as run_klikit_unified,
     )
     from modules.shopee.force_open.refactored import run_force_open
+    from modules.shopee.shopee_menu_extract import run_menu_extraction, save_menu_data
 
 except ImportError as e:
     print(f"[FATAL] An import failed: {e}. Ensure all config files are correct.")
@@ -103,6 +104,7 @@ def main(task_name, dry_run=False, scale_level=1):
         "klikit_unified": run_klikit_unified,
         "extract_raw": run_raw_extraction,
         "force_open": run_force_open,
+        "shopee_menu_extract": run_menu_extraction,
     }
 
     task_function = task_map.get(task_name)
@@ -123,53 +125,66 @@ def main(task_name, dry_run=False, scale_level=1):
     is_logged_in = False
 
     while True:
-        base_index = display_merchant_menu()
-        # Temporarily disable logging while waiting for user input
-        log.setLevel(logging.CRITICAL)
-        try:
-            choice = int(input(f"Enter number (1-{base_index + 1}): "))
-            # Re-enable logging after input is received
-            log.setLevel(logging.INFO)
-        except ValueError:
-            log.setLevel(logging.INFO)  # Re-enable logging on error
-            log.error("Invalid input.")
-            continue
-
-        if choice == base_index + 2:
-            log.info("Returning to main menu.")
-            break
-        elif choice == base_index + 1:
-            browser_session, is_logged_in = handle_profile_reset(browser_session)
-            continue
-        elif choice == base_index:
-            if task_name not in offline_tasks:
-                log.info("Starting manual login setup...")
-                if browser_session is None:
-                    browser_session = BrowserSession()
-                if not browser_session.driver:
-                    log.critical("Browser session failed to initialize.")
-                    break
-
-            browser_session.driver.get(
-                "https://partner.business.accounts.shopee.co.id/authenticate/login/"
-            )
-            log.warning(
-                "Please log in manually in the browser window. Press Enter here when you are done..."
-            )
-            input()  # Wait for user to press Enter
-            is_logged_in = True
-            log.info("Manual login complete. You can now select a task to run.")
-            continue
-
         merchants_to_process = []
-        if choice == 1:
-            merchants_to_process = MERCHANT_PROCESSING_LIST
-        # Adjust the upper bound for merchant selection
-        elif 2 <= choice < base_index:
-            merchants_to_process.append(MERCHANT_PROCESSING_LIST[choice - 2])
+        # AUTO-RUN LOGIC: If task is menu extraction, default to all merchants and skip menu
+        if task_name == "shopee_menu_extract":
+             log.info("Task 'shopee_menu_extract' selected. Defaulting to 'Run All Merchants' per configuration.")
+             merchants_to_process = MERCHANT_PROCESSING_LIST
+             auto_run = True
         else:
-            log.error(f"Invalid choice '{choice}'. Please try again.")
-            continue
+             auto_run = False
+             base_index = display_merchant_menu()
+             # Temporarily disable logging while waiting for user input
+             log.setLevel(logging.CRITICAL)
+             try:
+                 choice = int(input(f"Enter number (1-{base_index + 1}): "))
+                 # Re-enable logging after input is received
+                 log.setLevel(logging.INFO)
+             except ValueError:
+                 log.setLevel(logging.INFO)  # Re-enable logging on error
+                 log.error("Invalid input.")
+                 continue
+
+             if choice == base_index + 2:
+                 log.info("Returning to main menu.")
+                 break
+             elif choice == base_index + 1:
+                 browser_session, is_logged_in = handle_profile_reset(browser_session)
+                 continue
+             elif choice == base_index:
+                 if task_name not in offline_tasks:
+                    log.info("Starting manual login setup...")
+                    if browser_session and getattr(browser_session, "headless", True):
+                        log.info("Switching to visible browser for manual login...")
+                        browser_session.quit()
+                        browser_session = None
+
+                    if browser_session is None:
+                        browser_session = BrowserSession(headless=False)
+
+                    if not browser_session.driver:
+                        log.critical("Browser session failed to initialize.")
+                        break
+
+                 browser_session.driver.get(
+                    "https://partner.business.accounts.shopee.co.id/authenticate/login/"
+                 )
+                 log.warning(
+                    "Please log in manually in the browser window. Press Enter here when you are done..."
+                 )
+                 input()  # Wait for user to press Enter
+                 is_logged_in = True
+                 log.info("Manual login complete. You can now select a task to run.")
+                 continue
+
+             if choice == 1:
+                 merchants_to_process = MERCHANT_PROCESSING_LIST
+             # Adjust the upper bound for merchant selection
+             elif 2 <= choice < base_index:
+                 merchants_to_process.append(MERCHANT_PROCESSING_LIST[choice - 2])
+             else:
+                 log.error(f"Invalid choice '{choice}'. Please try again.")
+                 continue
 
         if task_name not in offline_tasks:
             if browser_session is None:
@@ -187,6 +202,7 @@ def main(task_name, dry_run=False, scale_level=1):
                     break
                 is_logged_in = True
 
+        collected_results = []
         for merchant_task in merchants_to_process:
             print("-" * 70)
             log.info(
@@ -224,6 +240,7 @@ def main(task_name, dry_run=False, scale_level=1):
 
             if switch_successful:
                 # Call the specific task function with the browser session and merchant info
+                res = None
                 if task_name == "force_open":
                     task_function(
                         browser_session,
@@ -232,11 +249,32 @@ def main(task_name, dry_run=False, scale_level=1):
                         dry_run=dry_run,
                     )
                 else:
-                    task_function(browser_session, merchant_task)
+                    res = task_function(browser_session, merchant_task)
+                
+                # Collect results
+                if res:
+                    collected_results.append(res)
             else:
                 log.warning(
                     f"Could not switch to merchant {merchant_task['validate_name']}. Skipping.",
                 )
+        
+        # Post-processing: Aggregate results for Menu Extraction
+        if task_name == "shopee_menu_extract" and collected_results:
+             log.info("Aggregating results for Menu Extraction...")
+             # collected_results is a list of lists (stores per portal)
+             flattened_data = []
+             for batch in collected_results:
+                 if isinstance(batch, list):
+                     flattened_data.extend(batch)
+                 else:
+                     log.warning(f"Unexpected result format from task: {type(batch)}")
+             
+             if flattened_data:
+                 save_menu_data(flattened_data)
+        
+        if auto_run:
+            break
 
     if browser_session:
         browser_session.quit()
@@ -259,6 +297,7 @@ if __name__ == "__main__":
             "klikit_unified",
             "extract_raw",
             "force_open",
+            "shopee_menu_extract",
         ],
         help="The specific scraping task to perform.",
     )

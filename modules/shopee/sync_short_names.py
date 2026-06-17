@@ -21,7 +21,7 @@ try:
     )
 
     # from modules.shopee.webshopee_api_client import WebShopeeAPIClient # REMOVED
-    from modules.shopee.api_utils import extract_tokens_from_driver, get_shopee_headers
+    from modules.shopee.api_utils import extract_tokens_from_driver, get_shopee_headers, get_auth_tokens
 except ImportError as e:
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [FATAL] Import error: {e}")
     exit()
@@ -112,15 +112,10 @@ def collect_short_names(browser_session):
             return None
 
         log.info("  Extracting cookies for API access...")
-        tob_token, entity_id = extract_tokens_from_driver(browser_session.driver)
+        # Use centralized token extraction which ensures we visit the right page
+        tob_token, entity_id = get_auth_tokens(browser_session.driver)
 
-        if not tob_token or not entity_id:
-            log.warning("  Cookies not found immediately. Refreshing page to ensure cookies are loaded...")
-            browser_session.driver.refresh()
-            time.sleep(5)
-            tob_token, entity_id = extract_tokens_from_driver(browser_session.driver)
-
-        if not tob_token or not entity_id:
+        if not tob_token:
             # Debugging: Log available cookies to understand why it failed
             try:
                 available_cookies = [c.get('name') for c in browser_session.driver.get_cookies()]
@@ -129,9 +124,15 @@ def collect_short_names(browser_session):
                 pass
             
             log.error(
-                "❌ Failed to find required authentication cookies (shopee_tob_token, shopee_tob_entity_id)."
+                "❌ Failed to find required authentication cookie (shopee_tob_token)."
             )
             return None
+
+        if not entity_id:
+            log.warning(
+                "  shopee_tob_entity_id not found in cookies. Proceeding with empty entity_id."
+            )
+            entity_id = ""
 
         # Run the API fetch synchronously
         # all_stores = asyncio.run(fetch_stores_via_api(tob_token, entity_id)) # REMOVED

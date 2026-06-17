@@ -11,9 +11,9 @@ MONDAY_BOARD_ID = 5006292952
 # Maps the 'output_name' from MERCHANT_PROCESSING_LIST to a specific Group ID on your Monday board.
 GROUP_MAPPING = {
     "Foodnesia": "group_mkw46q72",
-    "DoEat": "group_mkw45f1v",
     "WonderFood": "group_mks93rx3",
     "Lokarasa": "group_mkw4rjmz",
+    "DoEat": "group_mkw45f1v",
     "S1": "group_mkw4487b",
     "H1": "group_mkw41eee",
     "K1": "group_mkw4491t",
@@ -62,12 +62,12 @@ MERCHANT_PROCESSING_LIST = [
         "validate_name": "WonderFood",
         "output_name": "WonderFood",
     },
-    # {
-    #     "click_name": "Gurame Bakar, Do Eat",
-    #     "validate_name": "Gurame Bakar, Do Eat",
-    #     "output_name": "DoEat",
-    # },
     {"click_name": "LOKARASA", "validate_name": "LOKARASA", "output_name": "Lokarasa"},
+    {
+        "click_name": "Gurame Bakar, Do Eat",
+        "validate_name": "Gurame Bakar, Do Eat",
+        "output_name": "DoEat",
+    },
 ]
 
 # --- API Configuration ---

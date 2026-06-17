@@ -9,8 +9,8 @@ if PROJECT_ROOT not in sys.path:
 
 from common.sync_core import run_sync_main
 
-CONFIG_FILE_PATH = os.path.join(PROJECT_ROOT, "data", "cache", "vbo_sync_config.json")
-LOGGER_NAME = "sync_vbo"
+CONFIG_FILE_PATH = os.path.join(PROJECT_ROOT, "data", "cache", "ssot_sync_config.json")
+LOGGER_NAME = "sync_ssot"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"Sync full and short names for {LOGGER_NAME}.")

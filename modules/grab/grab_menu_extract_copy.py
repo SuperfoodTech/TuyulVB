@@ -1,5 +1,4 @@
 import argparse
-
 import json
 import os
 from datetime import datetime
@@ -12,130 +11,33 @@ import time
 import random
 from common import monday_utils
 from common.logger import get_logger
+from common.notifications import send_discord_file
+from common.config import get_config
+from modules.grab.api_utils import (
+    cookie_string_to_dict,
+    parse_cookie_input,
+    build_headers_for_api,
+)
+from modules.grab.browser_session import (
+    extract_cookies_and_token,
+    ensure_required_cookies_present,
+)
 
-
-DEFAULT_MERCHANTS = ["6-C7EHLGKXLLLKCE"]
-
-# Default mapping inferred from Monday (fallback). Keys are brand keywords -> Gr SID value
-DEFAULT_BRAND_MAPPING = {
-    "Foodnesia": "text_mky9b8z9",
-    "WonderFood": "text_mky974s9",
-    "Lokarasa": "text_mky9pxvr",
-    "DoEat": "text_mky9z4ts",
-}
-
-# Required cookie names that must be present in the extracted cookies
-REQUIRED_COOKIE_NAMES = [
+REQUIRED_CONSUMER_COOKIES = [
     "grabid-openid-authn-ck",
     "passenger_authn_token",
     "passenger_authn_token_jti",
 ]
 
 
-def ensure_required_cookies_present(
-    cookie_dict: Dict[str, str], context: str = ""
-) -> bool:
-    """Return True if all REQUIRED_COOKIE_NAMES exist and are non-empty in cookie_dict.
-    Logs missing cookies and context."""
-    missing = [k for k in REQUIRED_COOKIE_NAMES if not cookie_dict.get(k)]
-    if missing:
-        logger.error(
-            "Missing required cookies (%s) in %s. Cookies present: %s",
-            ", ".join(missing),
-            context or "cookies",
-            list(cookie_dict.keys()),
-        )
-        return False
-    logger.debug("All required cookies present in %s", context or "cookies")
-    return True
+DEFAULT_MERCHANTS = ["6-C7EHLGKXLLLKCE"]
 
-
-# Authentication is provided via CLI args or environment variables.
-# Provide `--cookies` and optionally `--x-hydra-jwt` (or supply
-# `HYDRA_DEVICE_TOKEN` which will be used as `x-hydra-jwt`).
-# Environment variable names supported: `GRAB_COOKIES`,
-# `GRAB_X_HYDRA_JWT`, `GRAB_X_HYDRA_TOKEN`, `HYDRA_DEVICE_TOKEN`.
-
-
-def build_headers(auth: Dict[str, str]) -> Dict[str, str]:
-    headers = {
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "id",
-        "origin": "https://food.grab.com",
-        "referer": "https://food.grab.com/",
-        "user-agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-        ),
-        "x-country-code": "ID",
-        "x-gfc-country": "ID",
-    }
-    # Use x-hydra-jwt for hydra device/session tokens
-    if auth.get("x-hydra-jwt"):
-        headers["x-hydra-jwt"] = auth["x-hydra-jwt"]
-
-    # Only use cookies as extracted from auth/cookies
-    cookie_str = auth.get("cookies") or ""
-    cookie_dict = cookie_string_to_dict(cookie_str)
-    headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookie_dict.items())
-    return headers
-
-
-def cookie_dict_to_string(d: Dict[str, str]) -> str:
-    parts = []
-    for k, v in d.items():
-        if v is None:
-            v = ""
-        parts.append(f"{k}={v}")
-    return "; ".join(parts)
-
-
-def cookie_string_to_dict(cookie_str: str) -> Dict[str, str]:
-    """Convert a cookie header string into a dict suitable for `requests.Session.cookies.update`.
-    Example: 'a=1; b=2' -> {'a':'1', 'b':'2'}
-    """
-    if not cookie_str:
-        return {}
-    out: Dict[str, str] = {}
-    for part in cookie_str.split(";"):
-        part = part.strip()
-        if not part:
-            continue
-        if "=" in part:
-            k, v = part.split("=", 1)
-            out[k.strip()] = v.strip()
-    return out
-
-
-def parse_cookie_input(raw: str):
-    """Parse cookie input which may be:
-    - a JSON string representing a dict of cookie-name -> value
-    - a path to a JSON file containing such a dict
-    - already a cookie header string
-    Returns a cookie header string or None.
-    """
-    if not raw:
-        return None
-    # Try path to JSON file first
-    try:
-        if os.path.exists(raw):
-            with open(raw, "r", encoding="utf-8") as f:
-                obj = json.load(f)
-                if isinstance(obj, dict):
-                    return cookie_dict_to_string(obj)
-    except Exception:
-        pass
-
-    # Try parsing as JSON string
-    try:
-        obj = json.loads(raw)
-        if isinstance(obj, dict):
-            return cookie_dict_to_string(obj)
-    except Exception:
-        pass
-
-    # Fallback: assume it's already a cookie header string
-    return raw
+DEFAULT_BRAND_MAPPING = {
+    "Foodnesia": "text_mky9b8z9",
+    "WonderFood": "text_mky974s9",
+    "Lokarasa": "text_mky9pxvr",
+    "DoEat": "text_mky9z4ts",
+}
 
 
 logger = get_logger("grab_menu_extract")
@@ -315,44 +217,12 @@ def build_row(
 
     row = {
         "Fullname": merchant.get("name", ""),
-        "Shortname": "",
-        "Comb Item": "",
-        "SID": "",
         "Gr - SID": merchant.get("ID", ""),
-        "Outlet": "",
-        "Klikit Brand Name": "",
-        "Price level": brand,
         "Category": category_name,
         "Item": item.get("name", ""),
         "Description": item.get("description", ""),
-        "Slash Price": "",
-        "Flash Sale": "",
-        "Modifier Group Code": "",
-        "COGS Menu 🔥": "",
-        "Category 🔥": "",
-        "Item 🔥": "",
-        "Description 🔥": "",
-        "Max %🔥 Go": "",
-        "Max Rp 🔥 Go": "",
-        "Fake Price Go": "",
-        "Markup % 🔥 Go": "",
-        "Slash Price Rp 🔥 Go": "",
-        "Slash Price % Go": "",
-        "Go Price": "",
-        "Max %🔥 Gr": "",
-        "Max Rp 🔥 Gr": "",
         "Fake Price Gr": fake_price_gr,
-        "Markup % 🔥 Gr": "",
-        "Slash Price Rp 🔥 Gr": "",
-        "Slash Price % Gr": "",
         "Gr Price": gr_price,
-        "Max % 🔥 S": "",
-        "Max Rp 🔥 S": "",
-        "Fake Price S": "",
-        "Markup % 🔥 S": "",
-        "Slash Price Rp 🔥 S": "",
-        "Slash Price % S": "",
-        "S Price": "",
         "Availability": "Yes" if is_available_value(item.get("available")) else "No",
         "Scale": color_value,
     }
@@ -361,16 +231,7 @@ def build_row(
 
 def write_excel(rows: List[dict], output_file: str):
     df = pd.DataFrame(rows)
-
-    # Ensure the Price level ordering
-    sort_order = ["Foodnesia", "WonderFood", "Lokarasa", "DoEat"]
-    df["Price level"] = pd.Categorical(
-        df["Price level"], categories=sort_order, ordered=True
-    )
-
-    df.sort_values(
-        by=["Price level", "Fullname", "SID", "Category", "Item"], inplace=True
-    )
+    df.sort_values(by=["Fullname", "Gr - SID", "Category", "Item"], inplace=True)
 
     # Write to excel and format currency for price columns
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -394,6 +255,34 @@ def write_excel(rows: List[dict], output_file: str):
                             cell.number_format = "Rp#,##0.00"
         except Exception:
             pass
+
+
+def interactive_mode_selection():
+    """Display an interactive menu to let user choose between manual setup or auto-extract."""
+    print("\n" + "=" * 70)
+    print("GrabFood Menu Extraction Tool")
+    print("=" * 70)
+    print("\nPlease choose a mode to proceed:\n")
+    print("  1. Extract")
+    print("  2. Manual Setup")
+    print("  3. Exit")
+    print("\n" + "-" * 70)
+
+    while True:
+        try:
+            choice = input("Enter your choice (1-3): ").strip()
+            if choice == "1":
+                return "auto_extract"
+            elif choice == "2":
+                return "setup"
+            elif choice == "3":
+                logger.info("User chose to exit.")
+                return None
+            else:
+                print("Invalid choice. Please enter 1, 2, or 3.")
+        except KeyboardInterrupt:
+            logger.info("User interrupted; exiting.")
+            return None
 
 
 def main():
@@ -427,8 +316,6 @@ def main():
         help="Enable debug logging and verbose request/response output.",
     )
 
-    # Default to auto-extract to simplify usage; provide --no-auto-extract to disable.
-    parser.set_defaults(auto_extract=True)
     parser.add_argument(
         "--brand-mapping",
         "-b",
@@ -458,6 +345,20 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
+
+    # If no mode explicitly specified, show interactive menu
+    if not args.setup and not args.auto_extract:
+        mode = interactive_mode_selection()
+        if mode is None:
+            return
+        if mode == "setup":
+            args.setup = True
+            args.auto_extract = False
+            args.headless = False  # Manual setup: show browser UI
+        elif mode == "auto_extract":
+            args.setup = False
+            args.auto_extract = True
+            args.headless = True  # Auto-extract: run in headless mode by default
 
     if args.merchant_ids:
         merchant_ids = [s.strip() for s in args.merchant_ids.split(",") if s.strip()]
@@ -495,7 +396,7 @@ def main():
         or os.environ.get("HYDRA_DEVICE_TOKEN")
     )
 
-    if not cookies and not args.auto_extract:
+    if not cookies and not args.auto_extract and not args.setup:
         logger.error(
             "cookies must be provided via --cookies or GRAB_COOKIES env var (or enable auto-extract)."
         )
@@ -509,90 +410,20 @@ def main():
         auth["x-hydra-jwt"] = hydra_device_token
     auth["cookies"] = cookies
 
-    headers = build_headers(auth)
+    headers = build_headers_for_api(auth)
 
     # If cookies were provided via CLI/env, validate they contain required keys
     provided_cookie_dict = cookie_string_to_dict(auth.get("cookies") or "")
     if provided_cookie_dict:
         if not ensure_required_cookies_present(
-            provided_cookie_dict, "initial provided cookies"
+            provided_cookie_dict,
+            "initial provided cookies",
+            required_keys=REQUIRED_CONSUMER_COOKIES,
         ):
             logger.error(
                 "Aborting due to missing required cookies in provided cookie string."
             )
             return
-
-    # Helper to extract cookies and hydra token from browser
-    def extract_cookies_and_token(driver):
-        start = time.time()
-        timeout = 120
-        found_cookie = None
-        found_token = None
-        while time.time() - start < timeout:
-            try:
-                ready = driver.execute_script("return document.readyState")
-            except Exception:
-                ready = None
-            # Try to get cookies from the browser cookie store (includes HttpOnly)
-            try:
-                selenium_cookies = driver.get_cookies() or []
-                cookie_str_from_store = "; ".join(
-                    f"{c.get('name')}={c.get('value','')}" for c in selenium_cookies
-                )
-            except Exception:
-                selenium_cookies = []
-                cookie_str_from_store = ""
-            # Also read document.cookie (excludes HttpOnly)
-            try:
-                cookie_str = driver.execute_script("return document.cookie || ''")
-            except Exception:
-                cookie_str = ""
-            try:
-                token = driver.execute_script(
-                    "return window.sessionStorage.getItem('hydra_device_token') || null"
-                )
-            except Exception:
-                token = None
-
-            # Prefer cookie store (captures HttpOnly); fall back to document.cookie
-            parsed_store = cookie_string_to_dict(cookie_str_from_store or "")
-            parsed_doc = cookie_string_to_dict(cookie_str or "")
-            present_store = list(parsed_store.keys())
-            present_doc = list(parsed_doc.keys())
-            logger.debug(
-                "extract_cookies_and_token: ready=%s store_cookies=%s doc_cookies=%s token_present=%s",
-                ready,
-                present_store,
-                present_doc,
-                bool(token),
-            )
-
-            # Accept when required cookies are present in the browser cookie store
-            if parsed_store and ensure_required_cookies_present(
-                parsed_store, "browser cookie store"
-            ):
-                found_cookie = cookie_str_from_store
-                if token:
-                    found_token = token
-                break
-
-            # If store didn't have them, accept if document.cookie contains them (non-HttpOnly case)
-            if parsed_doc and ensure_required_cookies_present(
-                parsed_doc, "document.cookie"
-            ):
-                found_cookie = cookie_str
-                if token:
-                    found_token = token
-                break
-
-            # otherwise keep waiting; prefer page fully loaded
-            if ready != "complete":
-                time.sleep(1)
-                continue
-
-            time.sleep(2)
-
-        return found_cookie, found_token
 
     driver = None
     if args.setup:
@@ -614,9 +445,6 @@ def main():
         options.add_argument(
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         )
-        # Use a module-local selenium_profiles directory and allow an
-        # environment override so different automations don't share the
-        # same profile unintentionally.
         script_dir = os.path.dirname(os.path.abspath(__file__))
         base_profiles_dir = os.path.join(script_dir, "selenium_profiles")
         profile_name = os.environ.get("GRAB_SELENIUM_PROFILE", "grab_profile")
@@ -676,40 +504,91 @@ def main():
         driver.get(
             "https://food.grab.com/id/id/restaurant/rm-palapa-masakan-padang-lontar-delivery/6-CZJDEZC1GEMJL6?"
         )
-        cookies, token = extract_cookies_and_token(driver)
-        if cookies:
-            auth["cookies"] = cookies
-            logger.info("Extracted cookies from browser.")
-        else:
-            logger.warning("No cookies found in the browser session within timeout.")
-        if token:
-            auth["x-hydra-jwt"] = token
-            logger.info("Extracted hydra_device_token and mapped to x-hydra-jwt.")
-        else:
-            logger.warning(
-                "No hydra_device_token found in sessionStorage within timeout."
-            )
-        headers = build_headers(auth)
-        # Validate extracted cookies contain required keys
-        extracted = cookie_string_to_dict(auth.get("cookies") or "")
-        if not ensure_required_cookies_present(extracted, "auto-extract"):
-            # Keep the browser open for debugging when cookies are missing
-            logger.error(
-                "Aborting due to missing required cookies from browser extraction."
-            )
-            if driver:
-                logger.info(
-                    "Leaving Chrome open for inspection. Press Ctrl+C to close and quit the browser."
+        try:
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+
+            time.sleep(2)
+
+            # Check if already logged in by looking for the user icon
+            is_logged_in = False
+            try:
+                # Look for the logged-in box/user icon
+                WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located(
+                        (By.CLASS_NAME, "LoggedInBox___CoDLs")
+                    )
                 )
+                logger.info("User appears to be already logged in (found LoggedInBox).")
+                is_logged_in = True
+            except Exception:
+                # Not found, proceed to try clicking login button
+                pass
+
+            if not is_logged_in:
+                logger.info("Attempting to click 'Masuk/Daftar' button...")
                 try:
-                    while True:
-                        time.sleep(1)
-                except KeyboardInterrupt:
-                    logger.info("User requested to close browser; quitting driver.")
+                    login_btn = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.CLASS_NAME, "NotLoggedInBox___2ic3u")
+                        )
+                    )
+                    login_btn.click()
+                    logger.info("Clicked 'Masuk/Daftar' button.")
+                    time.sleep(2)
+                except Exception as e:
+                    logger.warning(
+                        "Could not click 'Masuk/Daftar' button (might be already logged in or not found): %s",
+                        e,
+                    )
+
+            cookies, token = extract_cookies_and_token(
+                driver, required_cookies=REQUIRED_CONSUMER_COOKIES
+            )
+            if cookies:
+                auth["cookies"] = cookies
+                logger.info("Extracted cookies from browser.")
+            else:
+                logger.warning(
+                    "No cookies found in the browser session within timeout."
+                )
+            if token:
+                auth["x-hydra-jwt"] = token
+                logger.info("Extracted hydra_device_token and mapped to x-hydra-jwt.")
+            else:
+                logger.warning(
+                    "No hydra_device_token found in sessionStorage within timeout."
+                )
+            headers = build_headers_for_api(auth)
+            # Validate extracted cookies contain required keys
+            extracted = cookie_string_to_dict(auth.get("cookies") or "")
+            if not ensure_required_cookies_present(
+                extracted, "auto-extract", required_keys=REQUIRED_CONSUMER_COOKIES
+            ):
+                # Keep the browser open for debugging when cookies are missing
+                logger.error(
+                    "Aborting due to missing required cookies from browser extraction."
+                )
+                if driver:
+                    logger.info(
+                        "Leaving Chrome open for inspection. Press Ctrl+C to close and quit the browser."
+                    )
                     try:
-                        driver.quit()
-                    except Exception:
-                        pass
+                        while True:
+                            time.sleep(1)
+                    except KeyboardInterrupt:
+                        logger.info("User requested to close browser; quitting driver.")
+                        try:
+                            driver.quit()
+                        except Exception:
+                            pass
+                return
+
+        except Exception as e:
+            logger.error(f"Error during auto-extraction: {e}")
+            if driver:
+                driver.quit()
             return
 
     # Use a single session for connection pooling and to help with rate limits
@@ -725,7 +604,9 @@ def main():
                 logger.debug("Session cookies set: %s", session.cookies.get_dict())
                 # Validate required cookies after populating session
                 if not ensure_required_cookies_present(
-                    cookie_dict, "session cookie setup"
+                    cookie_dict,
+                    "session cookie setup",
+                    required_keys=REQUIRED_CONSUMER_COOKIES,
                 ):
                     logger.error(
                         "Aborting due to missing required cookies in session. Browser left open for inspection."
@@ -756,8 +637,8 @@ def main():
     logger.debug("Final request headers: %s", headers)
     logger.debug("x-hydra-jwt present: %s", bool(auth.get("x-hydra-jwt")))
 
-    # Prepare timestamped output filename inside modules/grab/
-    out_dir = os.path.dirname(__file__)
+    # Prepare timestamped output filename inside data/output
+    out_dir = os.path.join(os.getcwd(), "data", "output")
     os.makedirs(out_dir, exist_ok=True)
 
     # Use provided output as prefix if given, otherwise use 'menu'
@@ -830,7 +711,9 @@ def main():
 
     for idx, mid in enumerate(mids_to_fetch):
         if driver and idx % 20 == 0 and idx != 0:
-            cookies, token = extract_cookies_and_token(driver)
+            cookies, token = extract_cookies_and_token(
+                driver, required_cookies=REQUIRED_CONSUMER_COOKIES
+            )
             if cookies:
                 auth["cookies"] = cookies
                 logger.info("Refreshed cookies from browser.")
@@ -845,7 +728,7 @@ def main():
                 logger.warning(
                     "No hydra_device_token found in sessionStorage during refresh."
                 )
-            headers = build_headers(auth)
+            headers = build_headers_for_api(auth)
             session.headers.update(headers)
             # Also update session cookies
             try:
@@ -856,7 +739,11 @@ def main():
                         "Session cookies refreshed: %s", session.cookies.get_dict()
                     )
                     # Validate required cookies after refresh
-                    if not ensure_required_cookies_present(cookie_dict, "refresh"):
+                    if not ensure_required_cookies_present(
+                        cookie_dict,
+                        "refresh",
+                        required_keys=REQUIRED_CONSUMER_COOKIES,
+                    ):
                         logger.error(
                             "Aborting due to missing required cookies after refresh. Browser left open for inspection."
                         )
@@ -891,7 +778,7 @@ def main():
             if THROTTLE_EVERY > 0 and request_count % THROTTLE_EVERY == 0:
                 pause = random.uniform(THROTTLE_MIN, THROTTLE_MAX)
                 logger.info(
-                    "Reached %s requests — pausing %.1fs to reduce rate-limit risk...",
+                    "Reached %s requests — pausing %.1fs",
                     request_count,
                     pause,
                 )
@@ -929,6 +816,18 @@ def main():
         time.sleep(random.uniform(1, 3))
     write_excel(all_rows, output_file)
     logger.info(f"Wrote {len(all_rows)} rows to {output_file}")
+
+    # Send to Discord
+    try:
+        config = get_config()
+        if config.DISCORD_WEBHOOK_URL:
+            send_discord_file(
+                config.DISCORD_WEBHOOK_URL,
+                output_file,
+                content=f"GrabFood Menu Extraction Complete: {os.path.basename(output_file)}",
+            )
+    except Exception as e:
+        logger.error(f"Failed to send file to Discord: {e}")
 
 
 if __name__ == "__main__":

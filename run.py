@@ -30,45 +30,25 @@ log = get_logger("run")
 #        for scripts that rely on relative paths for config files (like credentials.py).
 SCRIPTS = [
     {
-        "name": "Shopee : Get Outlet Data",
+        "name": "Shopee: Get Outlet data",
         "path": os.path.join("modules", "shopee", "main_runner.py"),
         "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
         "args": ["--task", "extract_raw"],
     },
     {
-        "name": "Shopee: Get Full Store Details",
+        "name": "Shopee: Get Menu Data",
         "path": os.path.join("modules", "shopee", "main_runner.py"),
         "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "sync_details"],
+        "args": ["--task", "shopee_menu_extract"],
     },
     {
-        "name": "Shopee: Get Store Short Names",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "sync_short_names"],
-    },
-    {
-        "name": "Shopee: Get Customer Details from Transactions",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "sync_customers"],
-    },
-    {
-        "name": "Shopee: Force Open Stores",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "force_open", "--scale", "1"],
-    },
-    {
-        "name": "Grab: Get Merchant Data",
+        "name": "Grab: Get Outlet Data",
         "path": os.path.join("modules", "grab", "monday-grab-extract.py"),
         "cwd": PROJECT_ROOT,
     },
     {
-        "name": "Monday: Watch for Duplicates Board SSOT",
-        "path": os.path.join(
-            "modules", "monday", "automation", "watch_duplicates_ssot.py"
-        ),
+        "name": "Grab: Get Menu Data",
+        "path": os.path.join("modules", "grab", "grab_menu_extract_copy.py"),
         "cwd": PROJECT_ROOT,
     },
     {
@@ -79,78 +59,80 @@ SCRIPTS = [
         "cwd": PROJECT_ROOT,
     },
     {
-        "name": "Monday: Watch for Duplicates Board Manual Disbursement (Order ID)",
+        "name": "Monday: Watch for Duplicates Board SSOT",
         "path": os.path.join(
-            "modules", "monday", "automation", "watch_duplicates_orderid.py"
+            "modules", "monday", "automation", "watch_duplicates_ssot.py"
         ),
         "cwd": PROJECT_ROOT,
     },
+    # {
+    #     "name": "Grab: Address Validation",
+    #     "path": os.path.join("modules", "grab", "monday-grab-address-validation.py"),
+    #     "cwd": PROJECT_ROOT,
+    # },
+    # {
+    #     "name": "Grab: Klikit Address Validation",
+    #     "path": os.path.join("modules", "grab", "sync_address_klikit_grab.py"),
+    #     "cwd": PROJECT_ROOT,
+    # },
+    # {
+    #     "name": "Monday: Sync Short Names (Pull -> SSOT)",
+    #     "path": os.path.join(
+    #         "modules", "monday", "automation", "short_name_updater.py"
+    #     ),
+    #     "cwd": PROJECT_ROOT,
+    # },
+    # {
+    #     "name": "Shopee: Address Validation",
+    #     "path": os.path.join("modules", "shopee", "main_runner.py"),
+    #     "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
+    #     "args": ["--task", "address_validation"],
+    # },
+    # {
+    #     "name": "Shopee: Klikit Address Validation",
+    #     "path": os.path.join("modules", "shopee", "main_runner.py"),
+    #     "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
+    #     "args": ["--task", "klikit_validation"],
+    # },
+    # {
+    #     "name": "Shopee: Klikit Address Validation - DRY RUN",
+    #     "path": os.path.join("modules", "shopee", "main_runner.py"),
+    #     "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
+    #     "args": ["--task", "klikit_validation", "--dry-run"],
+    # },
+    # {
+    #     "name": "Shopee: Klikit OPH Sync (Open/Closed)",
+    #     "path": os.path.join("modules", "shopee", "main_runner.py"),
+    #     "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
+    #     "args": ["--task", "klikit_oph"],
+    # },
+    # {
+    #     "name": "Shopee/Grab: Unified Klikit Sync (Address & OPH)",
+    #     "path": os.path.join("modules", "shopee", "main_runner.py"),
+    #     "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
+    #     "args": ["--task", "klikit_unified"],
+    # },
+    # {
+    #     "name": "Monday: Sync Full & Short Names (VBO)",
+    #     "path": os.path.join(
+    #         "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
+    #     ),
+    #     "cwd": PROJECT_ROOT,
+    # },
+    # {
+    #     "name": "Monday: Sync Full & Short Names (VB Database) - DRY RUN",
+    #     "path": os.path.join(
+    #         "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
+    #     ),
+    #     "cwd": PROJECT_ROOT,
+    #     "args": ["--dry-run"],
+    # },
     {
-        "name": "Monday: Input WA Numbers from Excel",
-        "path": os.path.join("modules", "monday", "automation", "input-wa.py"),
-        "cwd": PROJECT_ROOT,
-    },
-    {
-        "name": "Grab: Address Validation",
-        "path": os.path.join("modules", "grab", "monday-grab-address-validation.py"),
-        "cwd": PROJECT_ROOT,
-    },
-    {
-        "name": "Grab: Klikit Address Validation",
-        "path": os.path.join("modules", "grab", "sync_address_klikit_grab.py"),
-        "cwd": PROJECT_ROOT,
-    },
-    {
-        "name": "Monday: Sync Short Names (Pull -> SSOT)",
+        "name": "Monday: Sync Full & Short Names (SSOT)",
         "path": os.path.join(
-            "modules", "monday", "automation", "short_name_updater.py"
+            "modules", "monday", "automation", "sync-shopee-grab-ssot.py"
         ),
         "cwd": PROJECT_ROOT,
-    },
-    {
-        "name": "Shopee: Address Validation",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "address_validation"],
-    },
-    {
-        "name": "Shopee: Klikit Address Validation",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "klikit_validation"],
-    },
-    {
-        "name": "Shopee: Klikit Address Validation - DRY RUN",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "klikit_validation", "--dry-run"],
-    },
-    {
-        "name": "Shopee: Klikit OPH Sync (Open/Closed)",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "klikit_oph"],
-    },
-    {
-        "name": "Shopee/Grab: Unified Klikit Sync (Address & OPH)",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "klikit_unified"],
-    },
-    {
-        "name": "Monday: Sync Full & Short Names (VB Database)",
-        "path": os.path.join(
-            "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
-        ),
-        "cwd": PROJECT_ROOT,
-    },
-    {
-        "name": "Monday: Sync Full & Short Names (VB Database) - DRY RUN",
-        "path": os.path.join(
-            "modules", "monday", "automation", "sync-shopee-grab-vbo.py"
-        ),
-        "cwd": PROJECT_ROOT,
-        "args": ["--dry-run"],
     },
     {
         "name": "Monday: Sync Full & Short Names (Klikit Migration Database)",
@@ -159,13 +141,18 @@ SCRIPTS = [
         ),
         "cwd": PROJECT_ROOT,
     },
+    # {
+    #     "name": "Monday: Sync Full & Short Names (Klikit Migration Database) - DRY RUN",
+    #     "path": os.path.join(
+    #         "modules", "monday", "automation", "sync-shopee-grab-klikit.py"
+    #     ),
+    #     "cwd": PROJECT_ROOT,
+    #     "args": ["--dry-run"],
+    # },
     {
-        "name": "Monday: Sync Full & Short Names (Klikit Migration Database) - DRY RUN",
-        "path": os.path.join(
-            "modules", "monday", "automation", "sync-shopee-grab-klikit.py"
-        ),
+        "name": "Monday: Import Data from Excel",
+        "path": os.path.join("modules", "monday", "automation", "import-excel.py"),
         "cwd": PROJECT_ROOT,
-        "args": ["--dry-run"],
     },
 ]
 
@@ -180,10 +167,10 @@ def run_health_check():
     def check(condition, success_msg, failure_msg):
         nonlocal overall_ok
         if condition:
-            log.info(f"✅ {success_msg}")
+            log.info(f"[OK] {success_msg}")
             return True
         else:
-            log.error(f"❌ {failure_msg}")
+            log.error(f"[FAIL] {failure_msg}")
             overall_ok = False
             return False
 
@@ -201,12 +188,11 @@ def run_health_check():
             with open(file_path, "r") as f:
                 data = json.load(f)
             log.info(
-                f"  -> ✅ JSON config file '{os.path.basename(file_path)}' parsed successfully.",
+                f"  -> [OK] JSON config file '{os.path.basename(file_path)}' parsed successfully.",
             )
         except json.JSONDecodeError:
             log.error(
-                f"  -> ❌ JSON config file '{os.path.basename(file_path)}' is not valid JSON.",
-                f"JSON config file '{os.path.basename(file_path)}' parsed successfully.",
+                f"  -> [FAIL] JSON config file '{os.path.basename(file_path)}' is not valid JSON.",
             )
             overall_ok = False
             return False
@@ -235,7 +221,7 @@ def run_health_check():
                 continue
 
             # If all checks pass for the key
-            log.info(f"  -> ✅ Key '{key}' is present and valid.")
+            log.info(f"  -> [OK] Key '{key}' is present and valid.")
 
         if not file_ok:
             overall_ok = False
@@ -266,16 +252,22 @@ def run_health_check():
 
         packages_ok = True
         for line in lines:
-            package_name = line.strip()
-            if not package_name or package_name.startswith("#"):
+            line = line.strip()
+            # Handle comments and empty lines
+            if not line or line.startswith("#"):
+                continue
+
+            # Remove inline comments
+            package_name = line.split("#")[0].strip()
+            if not package_name:
                 continue
 
             module_name = package_map.get(package_name, package_name)
             try:
                 importlib.import_module(module_name)
-                log.info(f"  -> ✅ Package '{package_name}' is installed.")
+                log.info(f"  -> [OK] Package '{package_name}' is installed.")
             except ImportError:
-                log.error(f"  -> ❌ Package '{package_name}' is NOT installed.")
+                log.error(f"  -> [FAIL] Package '{package_name}' is NOT installed.")
                 packages_ok = False
 
         if not packages_ok:
@@ -289,7 +281,7 @@ def run_health_check():
         nonlocal overall_ok
         try:
             module = importlib.import_module(module_path)
-            log.info(f"✅ Config file for '{module_path}' imported successfully.")
+            log.info(f"[OK] Config file for '{module_path}' imported successfully.")
             module_ok = True
 
             for var_name, var_schema in schema.items():
@@ -341,7 +333,7 @@ def run_health_check():
                     continue
 
                 # If all checks pass
-                log.info(f"  -> ✅ Variable '{var_name}' is present and valid.")
+                log.info(f"  -> [OK] Variable '{var_name}' is present and valid.")
 
             if not module_ok:
                 overall_ok = False
@@ -353,160 +345,202 @@ def run_health_check():
             overall_ok = False
             return False
 
-    # 0. Python Packages
-    check_python_packages()
+    def check_core():
+        check_python_packages()
+        log.info("-" * 80)
+        log.info("Checking Global Configurations...")
+        env_path = os.path.join(PROJECT_ROOT, ".env")
+        if check(os.path.exists(env_path), ".env file found.", ".env file is missing."):
+            load_dotenv(dotenv_path=env_path, override=True)
+            check(
+                os.getenv("MONDAY_API_KEY"),
+                "MONDAY_API_KEY is present.",
+                "MONDAY_API_KEY is missing or empty in .env file.",
+            )
+        log.info("-" * 80)
 
-    log.info("-" * 80)
+    def check_shopee():
+        log.info("Checking Shopee Scrapper Configurations...")
+        check_module_vars("config.credentials_shopee", {"ACCOUNT_CREDS": dict})
+        check_module_vars(
+            "config.settings_shopee",
+            {
+                "MERCHANT_PROCESSING_LIST": {
+                    "type": list,
+                    "items": ["validate_name", "output_name"],
+                },
+                "MONDAY_BOARD_ID": int,
+                "GROUP_MAPPING": dict,
+            },
+        )
+        log.info("-" * 80)
+        log.info("Checking Shopee 'Address Validation' Configurations...")
+        check_module_vars(
+            "config.addressettings",
+            {
+                "SOURCE_BOARD_ID": int,
+                "TARGET_BOARD_ID": int,
+                "MATCH_BOARD_ID": int,
+                "GROUP_MAPPING": dict,
+                "TARGET_COL_STORE_ID": str,
+                "TARGET_COL_ADDRESS_STATUS": str,
+                "TARGET_COL_ADDRESS": str,
+                "MATCH_COL_STORE_ID": str,
+                "MATCH_COL_ADDRESS": str,
+            },
+        )
+        log.info("-" * 80)
 
-    # 1. Global .env file
-    log.info("Checking Global Configurations...")
-    env_path = os.path.join(PROJECT_ROOT, ".env")
-    if check(os.path.exists(env_path), ".env file found.", ".env file is missing."):
-        load_dotenv(dotenv_path=env_path, override=True)
+    def check_grab():
+        log.info("Checking Grab Scrapper Configurations...")
+        check_module_vars("config.credentials_grab", {"ACCOUNT_CREDS": dict})
+        check_module_vars(
+            "config.settings_grab",
+            {
+                "GRAB_MERCHANT_CONFIG": {
+                    "type": dict,
+                    "keys": [
+                        "login_url",
+                        "logout_url",
+                        "merchant_list_url",
+                        "username_field_id",
+                        "password_field_id",
+                        "continue_after_username_xpath",
+                    ],
+                },
+                "TARGET_API_URL": str,
+                "SINGLE_OUTLET_CHECK_URL": str,
+                "MONDAY_BOARD_ID": int,
+                "MONDAY_TARGET_GROUP": {
+                    "type": list,
+                    "items": ["source_portal", "group_id"],
+                },
+            },
+        )
+        log.info("-" * 80)
+        log.info("Checking Grab 'Address Validation' Configurations...")
+        check_module_vars(
+            "config.valsettings_grab",
+            {
+                "SOURCE_BOARD_ID": int,
+                "DESTINATION_BOARD_ID": int,
+                "MONDAY_SID_COLUMN_MAP": dict,
+            },
+        )
+        check_module_vars(
+            "config.settings_grab",
+            {
+                "GRAB_MERCHANT_CONFIG": dict,
+                "MONDAY_TARGET_GROUP": list,
+            },
+        )
+        log.info("-" * 80)
+
+    def check_monday():
+        log.info("Checking Monday 'Watch Duplicates' Configurations...")
+
+        # Ensure .env is loaded and API key is present
+        env_path = os.path.join(PROJECT_ROOT, ".env")
+        if os.path.exists(env_path):
+            load_dotenv(dotenv_path=env_path, override=True)
+
         check(
             os.getenv("MONDAY_API_KEY"),
             "MONDAY_API_KEY is present.",
             "MONDAY_API_KEY is missing or empty in .env file.",
         )
 
-    log.info("-" * 80)
-
-    # 2. Shopee Scrapper
-    log.info("Checking Shopee Scrapper Configurations...")
-    check_module_vars("config.credentials_shopee", {"ACCOUNT_CREDS": dict})
-    check_module_vars(
-        "config.settings_shopee",
-        {
-            "MERCHANT_PROCESSING_LIST": {
-                "type": list,
-                "items": ["validate_name", "output_name"],
+        check_module_vars(
+            "modules.monday.automation.config.dupsettings",
+            {
+                "MONDAY_BOARD_ID_SSOT": int,
+                "DUPLICATE_CHECKS_SSOT": {"type": list, "items": ["source", "target"]},
+                "MONDAY_BOARD_ID_VBO": int,
+                "DUPLICATE_CHECKS_VBO": {"type": list, "items": ["source", "target"]},
             },
-            "MONDAY_BOARD_ID": int,
-            "GROUP_MAPPING": dict,
-        },
-    )
+        )
+        log.info("-" * 80)
 
-    log.info("-" * 80)
+        log.info("Checking Monday 'Short Name Updater' Configurations...")
+        check(
+            os.getenv("DISCORD_WEBHOOK_URL"),
+            "DISCORD_WEBHOOK_URL is present for notifications.",
+            "DISCORD_WEBHOOK_URL is missing. Notifications will be skipped.",
+        )
+        log.info("-" * 80)
 
-    # 3. Grab Scrapper
-    log.info("Checking Grab Scrapper Configurations...")
-    check_module_vars("config.credentials_grab", {"ACCOUNT_CREDS": dict})
-    check_module_vars(
-        "config.settings_grab",
-        {
-            "GRAB_MERCHANT_CONFIG": {
-                "type": dict,
-                "keys": [
-                    "login_url",
-                    "logout_url",
-                    "merchant_list_url",
-                    "username_field_id",
-                    "password_field_id",
-                    "continue_after_username_xpath",
-                ],
+        log.info("Checking Monday 'Input WA' Configurations...")
+        excel_path = os.path.join(
+            PROJECT_ROOT, "S1 Database Mitra - Cluster 1 FWL+D.xlsx"
+        )
+        check(
+            os.path.exists(excel_path),
+            "Excel file 'S1 Database Mitra - Cluster 1 FWL+D.xlsx' found.",
+            "The required Excel file for the WA input script is missing.",
+        )
+        log.info("-" * 80)
+
+        log.info("Checking Monday 'VBO Sync' Configurations...")
+        check_json_file(
+            os.path.join(PROJECT_ROOT, "data", "config", "vbo_sync_config.json"),
+            {
+                "target_board_id": int,
+                "target_group_id": str,
+                "sync_map": {
+                    "type": list,
+                    # A deeper check could be added here if needed
+                },
             },
-            "TARGET_API_URL": str,
-            "SINGLE_OUTLET_CHECK_URL": str,
-            "MONDAY_BOARD_ID": int,
-            "MONDAY_TARGET_GROUP": {
-                "type": list,
-                "items": ["source_portal", "group_id"],
-            },
-        },
-    )
+        )
+        log.info("-" * 80)
 
-    log.info("-" * 80)
+    # --- Interactive Menu ---
+    print("\nSelect Health Checks to Run:")
+    print("  1. All Checks")
+    print("  2. Core (Packages & Global Env)")
+    print("  3. Shopee Only")
+    print("  4. Grab Only")
+    print("  5. Monday Automation Only")
+    print("  0. Back")
 
-    # 4. Monday Automation - Watch Duplicates
-    log.info("Checking Monday 'Watch Duplicates' Configurations...")
-    check_module_vars(
-        "modules.monday.automation.config_dupsettings",
-        {
-            "MONDAY_BOARD_ID_SSOT": int,
-            "DUPLICATE_CHECKS_SSOT": {"type": list, "items": ["source", "target"]},
-            "MONDAY_BOARD_ID_VBO": int,
-            "DUPLICATE_CHECKS_VBO": {"type": list, "items": ["source", "target"]},
-        },
-    )
+    try:
+        # We need to temporarily enable input since we are inside an interactive script logic
+        # but the master runner loop handles input too.
+        # However, inside 'action' function, we can just use input().
+        choice = input("\nEnter choice (1-5): ").strip()
+        print("\n")
+    except KeyboardInterrupt:
+        return
 
-    log.info("-" * 80)
-
-    # 5. Monday Automation - Short Name Updater
-    log.info("Checking Monday 'Short Name Updater' Configurations...")
-    check(
-        os.getenv("DISCORD_WEBHOOK_URL"),
-        "DISCORD_WEBHOOK_URL is present for notifications.",
-        "DISCORD_WEBHOOK_URL is missing. Notifications will be skipped.",
-    )
-
-    log.info("-" * 80)
-
-    # 5. Monday Automation - Input WA
-    log.info("Checking Monday 'Input WA' Configurations...")
-    excel_path = os.path.join(PROJECT_ROOT, "S1 Database Mitra - Cluster 1 FWL+D.xlsx")
-    check(
-        os.path.exists(excel_path),
-        "Excel file 'S1 Database Mitra - Cluster 1 FWL+D.xlsx' found.",
-        "The required Excel file for the WA input script is missing.",
-    )
-
-    log.info("-" * 80)
-
-    # 6. Monday Automation - VBO Sync
-    log.info("Checking Monday 'VBO Sync' Configurations...")
-    check_json_file(
-        os.path.join(PROJECT_ROOT, "data", "config", "vbo_sync_config.json"),
-        {
-            "target_board_id": int,
-            "target_group_id": str,
-            "sync_map": {
-                "type": list,
-                # A deeper check could be added here if needed
-            },
-        },
-    )
-    log.info("-" * 80)
-
-    # 7. Shopee - Address Validation
-    log.info("Checking Shopee 'Address Validation' Configurations...")
-    check_module_vars(
-        "config.addressettings",
-        {
-            "SOURCE_BOARD_ID": int,
-            "TARGET_BOARD_ID": int,
-            "MATCH_BOARD_ID": int,
-            "GROUP_MAPPING": dict,
-            "TARGET_COL_STORE_ID": str,
-            "TARGET_COL_ADDRESS_STATUS": str,
-            "TARGET_COL_ADDRESS": str,
-            "MATCH_COL_STORE_ID": str,
-            "MATCH_COL_ADDRESS": str,
-        },
-    )
-    # 6. Grab - Address Validation
-    log.info("Checking Grab 'Address Validation' Configurations...")
-    check_module_vars("config.credentials_monday", {"ACCOUNT_CREDS": dict})
-    check_module_vars(
-        "config.valsettings_grab",
-        {
-            "SOURCE_BOARD_ID": int,
-            "DESTINATION_BOARD_ID": int,
-            "MONDAY_SID_COLUMN_MAP": dict,
-        },
-    )
-    check_module_vars(
-        "config.settings_grab",
-        {
-            "GRAB_MERCHANT_CONFIG": dict,
-            "MONDAY_TARGET_GROUP": list,
-        },
-    )
+    if choice == "0":
+        return
+    elif choice == "1":
+        check_core()
+        check_shopee()
+        check_grab()
+        check_monday()
+    elif choice == "2":
+        check_core()
+    elif choice == "3":
+        check_shopee()
+    elif choice == "4":
+        check_grab()
+    elif choice == "5":
+        check_monday()
+    else:
+        log.warning("Invalid choice. Running All Checks by default.")
+        check_core()
+        check_shopee()
+        check_grab()
+        check_monday()
 
     log.info("=" * 80)
     if overall_ok:
-        log.info("✅ Health check passed! All configurations seem to be in place.")
+        log.info(
+            "[OK] Health check passed! Selected configurations seem to be in place."
+        )
     else:
-        log.error("❌ Health check failed. Please fix the issues listed above.")
+        log.error("[FAIL] Health check failed. Please fix the issues listed above.")
 
 
 MENU_ITEMS = [
@@ -544,7 +578,7 @@ def main():
         try:
             choice = int(input(f"Enter your choice (1-{len(MENU_ITEMS) + 1}): "))
             # Re-enable logging after input is received
-            log.setLevel(logging.NOTSET)
+            log.setLevel(logging.INFO)
             if not 1 <= choice <= len(MENU_ITEMS) + 1:
                 raise ValueError
 
@@ -560,10 +594,9 @@ def main():
                 script_args = selected_item.get("args", [])
                 log.info(f"Executing script: {selected_item['name']}")
             else:
-                # Disable logging during the action if it's interactive
-                log.setLevel(logging.CRITICAL)
+                # Execute the action directly. We don't disable logging here because
+                # the action (like health check) relies on logging to show results.
                 selected_item["action"]()
-                log.setLevel(logging.NOTSET)
                 input("\nPress Enter to return to the main menu...")
                 continue
 
@@ -601,10 +634,10 @@ def main():
             print("-" * 80)
             log.setLevel(logging.CRITICAL)
             input("Press Enter to return to the main menu...")
-            log.setLevel(logging.NOTSET)
+            log.setLevel(logging.INFO)
 
         except (ValueError, IndexError):
-            log.setLevel(logging.NOTSET)  # Re-enable logging on error
+            log.setLevel(logging.INFO)  # Re-enable logging on error
             log.error("Invalid choice. Please enter a number from the menu.")
             time.sleep(2)
 
