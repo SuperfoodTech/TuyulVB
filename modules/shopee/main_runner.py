@@ -52,11 +52,10 @@ def display_merchant_menu():
 
 
 def handle_profile_reset(session):
-    """Handles the logic for deleting the Selenium profile."""
-    profile_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "selenium_profiles",
-        "shopee_profile",
+    """Handles the logic for deleting the isolated Chromium profile."""
+    profile_path = os.environ.get(
+        "SHOPEE_SELENIUM_PROFILE_PATH",
+        os.path.join(PROJECT_ROOT, "chromeprofile")
     )
     if os.path.exists(profile_path):
         if input("  [WARNING] Delete profile folder? [y/N]: ").lower() == "y":
