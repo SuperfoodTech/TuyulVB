@@ -58,6 +58,7 @@ def run_health_check():
             "python-dotenv": "dotenv",
             "webdriver-manager": "webdriver_manager",
             "PyJWT": "jwt",
+            "setuptools": "setuptools",
         }
 
         req_path = os.path.join(PROJECT_ROOT, "requirements.txt")
