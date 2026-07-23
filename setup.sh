@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Superfood Automation Suite (TuyulVB) - Seamless Installer for Linux / Raspberry Pi
+# Superfood Automation Suite (TuyulVB) - High-Speed Installer using UV
 # ==============================================================================
 
 set -e
@@ -9,42 +9,50 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "======================================================================"
-echo "🚀 Starting Seamless Installation for Superfood Automation Suite"
+echo "🚀 Starting Ultra-Fast Setup for Superfood Automation Suite"
 echo "======================================================================"
 
 # 1. System Package Installation (Debian/Ubuntu/Raspberry Pi OS)
 if command -v apt &> /dev/null; then
-    echo "📦 Updating system package list..."
+    echo "📦 Checking and installing system packages (Python, Chromium, Chromedriver)..."
     sudo apt update -y
-
-    echo "📦 Installing required system packages (Python, Chromium, Chromedriver)..."
-    sudo apt install -y python3 python3-pip python3-venv python3-full \
+    sudo apt install -y python3 python3-pip python3-venv python3-full curl \
                         chromium-browser chromium-chromedriver || \
-    sudo apt install -y python3 python3-pip python3-venv python3-full \
-                        chromium chromium-driver
-else
-    echo "⚠️ 'apt' package manager not found. Please ensure Python 3, Chromium, and Chromedriver are installed."
+    sudo apt install -y python3 python3-pip python3-venv python3-full curl \
+                        chromium chromium-driver || true
 fi
 
-# 2. Setup Virtual Environment (Recommended on modern Linux OS like Debian 12 / Pi OS)
+# 2. Check / Install 'uv' for ultra-fast environment & package resolution
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+
+if ! command -v uv &> /dev/null; then
+    echo "⚡ 'uv' not detected. Installing 'uv' package manager..."
+    if command -v pip3 &> /dev/null; then
+        pip3 install uv --break-system-packages 2>/dev/null || pip3 install uv || true
+    fi
+    if ! command -v uv &> /dev/null; then
+        curl -sSf https://astral.sh/uv/install.sh | sh || true
+        export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+    fi
+fi
+
+# 3. Setup Virtual Environment using UV (or fallback to standard venv)
 VENV_DIR="$SCRIPT_DIR/venv"
-if [ ! -d "$VENV_DIR" ]; then
-    echo "🐍 Creating Python virtual environment in '$VENV_DIR'..."
-    python3 -m venv "$VENV_DIR"
+if command -v uv &> /dev/null; then
+    echo "⚡ Using 'uv' to manage virtual environment & dependencies..."
+    if [ ! -d "$VENV_DIR" ]; then
+        uv venv "$VENV_DIR"
+    fi
+    echo "📥 Installing Python dependencies with 'uv'..."
+    uv pip install --python "$VENV_DIR/bin/python3" -r requirements.txt
 else
-    echo "🐍 Existing virtual environment found in '$VENV_DIR'."
+    echo "🐍 'uv' unavailable, falling back to standard venv..."
+    if [ ! -d "$VENV_DIR" ]; then
+        python3 -m venv "$VENV_DIR"
+    fi
+    "$VENV_DIR/bin/pip" install --upgrade pip
+    "$VENV_DIR/bin/pip" install -r requirements.txt
 fi
-
-# Activate venv for installation
-PYTHON_BIN="$VENV_DIR/bin/python3"
-PIP_BIN="$VENV_DIR/bin/pip"
-
-# 3. Upgrade Pip & Install Dependencies
-echo "⚡ Upgrading pip..."
-"$PIP_BIN" install --upgrade pip
-
-echo "📥 Installing Python dependencies from requirements.txt..."
-"$PIP_BIN" install -r requirements.txt
 
 # 4. Initialize .env file if missing
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
@@ -61,7 +69,7 @@ echo "🔑 Granting executable permissions to runner scripts..."
 chmod +x "$SCRIPT_DIR/1. run_master.sh" "$SCRIPT_DIR/2. run_force_open_scheduler.sh" "$SCRIPT_DIR/setup.sh"
 
 echo "======================================================================"
-echo "🎉 Installation completed successfully!"
+echo "🎉 Setup completed successfully!"
 echo "======================================================================"
 echo ""
 echo "Next Steps:"
