@@ -1,6 +1,7 @@
 # For web scraping and browser automation
 selenium
 selenium-wire
+blinker<1.8.0
 webdriver-manager
 
 # For data manipulation
@@ -23,3 +24,4 @@ schedule
 # For Async API Client
 aiohttp
 cachetools
+PyJWT

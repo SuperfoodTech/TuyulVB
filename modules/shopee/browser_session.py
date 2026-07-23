@@ -11,7 +11,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from seleniumwire import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
-from config.credentials_shopee import ACCOUNT_CREDS
+try:
+    from config.credentials_shopee import ACCOUNT_CREDS
+except ImportError:
+    ACCOUNT_CREDS = {}
 from selenium.webdriver.chrome.service import Service
 from types import SimpleNamespace
 import time
@@ -47,6 +50,8 @@ class BrowserSession:
         self.headless = headless
         try:
             options = webdriver.ChromeOptions()
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--log-level=3")
             options.add_experimental_option("excludeSwitches", ["enable-logging"])
             options.add_argument("--disable-blink-features=AutomationControlled")
@@ -93,6 +98,24 @@ class BrowserSession:
                     SWOptionsClass = None
 
             driver_init_error = None
+
+            def _init_driver(driver_cls, opts, sw_opts=None):
+                # Try built-in Selenium Manager first (supports system Chrome/Chromium v149+)
+                try:
+                    kwargs = {"options": opts}
+                    if sw_opts is not None:
+                        kwargs["seleniumwire_options"] = sw_opts
+                    return driver_cls(**kwargs)
+                except Exception as ex1:
+                    log.warning(f"Selenium Manager init failed ({ex1}), falling back to ChromeDriverManager...")
+                    kwargs = {
+                        "service": Service(ChromeDriverManager().install()),
+                        "options": opts,
+                    }
+                    if sw_opts is not None:
+                        kwargs["seleniumwire_options"] = sw_opts
+                    return driver_cls(**kwargs)
+
             # Attempt 1: use SeleniumWireOptions class if available
             if SWOptionsClass:
                 try:
@@ -105,27 +128,20 @@ class BrowserSession:
                         }
                     )
                     log.info("Initializing Chrome with SeleniumWireOptions instance")
-                    self.driver = webdriver.Chrome(
-                        service=Service(ChromeDriverManager().install()),
-                        options=options,
-                        seleniumwire_options=sw_opts,
-                    )
+                    self.driver = _init_driver(webdriver.Chrome, options, sw_opts)
                 except Exception as e:
                     driver_init_error = e
 
             # Attempt 2: fallback to passing a plain dict (recommended by selenium-wire docs)
             if not getattr(self, "driver", None):
                 try:
-                    self.driver = webdriver.Chrome(
-                        service=Service(ChromeDriverManager().install()),
-                        options=options,
-                        seleniumwire_options={
-                            "verify_ssl": False,
-                            "suppress_connection_errors": True,
-                            "disable_encoding": True,
-                            "mitm_http2": False,
-                        },
-                    )
+                    sw_opts_dict = {
+                        "verify_ssl": False,
+                        "suppress_connection_errors": True,
+                        "disable_encoding": True,
+                        "mitm_http2": False,
+                    }
+                    self.driver = _init_driver(webdriver.Chrome, options, sw_opts_dict)
                 except Exception as e:
                     driver_init_error = e
 
@@ -134,10 +150,7 @@ class BrowserSession:
                 try:
                     from selenium import webdriver as plain_webdriver  # type: ignore
 
-                    self.driver = plain_webdriver.Chrome(
-                        service=Service(ChromeDriverManager().install()),
-                        options=options,
-                    )
+                    self.driver = _init_driver(plain_webdriver.Chrome, options, None)
                 except Exception as e:
                     driver_init_error = e
 

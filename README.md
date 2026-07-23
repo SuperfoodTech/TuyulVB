@@ -34,7 +34,15 @@ This repository contains:
 
 ## 📋 Installation & Setup
 
-### 1. Install Dependencies
+### 1. Automated Installation (Linux / Raspberry Pi)
+
+Run the one-command installer:
+
+```bash
+./setup.sh
+```
+
+### 2. Manual Installation
 
 ```bash
 pip install -r requirements.txt
