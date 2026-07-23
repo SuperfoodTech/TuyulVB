@@ -72,20 +72,21 @@ class BrowserSession:
                 options.add_argument("--window-size=1920,1080")
             else:
                 options.add_argument("--start-maximized")
-                if sys.platform.startswith("linux") and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-                    options.add_argument("--display=:0")
             options.add_argument(
                 "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             )
+            # Isolated Chromium profile directory inside project root: 'chromeprofile'
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            base_profiles_dir = os.path.join(script_dir, "selenium_profiles")
-            profile_name = os.environ.get("SHOPEE_SELENIUM_PROFILE", "shopee_profile")
-            profile_path = os.path.join(base_profiles_dir, profile_name)
+            project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+            profile_path = os.environ.get(
+                "SHOPEE_SELENIUM_PROFILE_PATH",
+                os.path.join(project_root, "chromeprofile")
+            )
             os.makedirs(profile_path, exist_ok=True)
             profile_path = os.path.abspath(profile_path)
             options.add_argument(f"--user-data-dir={profile_path}")
-            # Also provide a profile-directory name to be explicit
-            options.add_argument(f"--profile-directory={profile_name}")
+            options.add_argument("--profile-directory=Default")
+            log.info(f"Using isolated Chromium profile at: {profile_path}")
             # Disable browser-side caching to avoid stale data and minimize disk usage
             options.add_argument("--disable-application-cache")
             options.add_argument("--disk-cache-size=0")
