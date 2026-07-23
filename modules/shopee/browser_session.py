@@ -1,4 +1,5 @@
 import os
+import sys
 import random
 import shutil
 from datetime import datetime
@@ -57,11 +58,22 @@ class BrowserSession:
             options.add_argument("--disable-blink-features=AutomationControlled")
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option("useAutomationExtension", False)
+
+            # Auto-detect Chromium binary location on Linux / Raspberry Pi OS
+            if sys.platform.startswith("linux"):
+                for bin_path in ["/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/sbin/chromium"]:
+                    if os.path.exists(bin_path):
+                        options.binary_location = bin_path
+                        log.info(f"Set Chromium binary location: {bin_path}")
+                        break
+
             if headless:
                 options.add_argument("--headless")
                 options.add_argument("--window-size=1920,1080")
             else:
                 options.add_argument("--start-maximized")
+                if sys.platform.startswith("linux") and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+                    options.add_argument("--display=:0")
             options.add_argument(
                 "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             )
