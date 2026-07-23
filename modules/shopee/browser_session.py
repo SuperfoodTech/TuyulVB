@@ -99,8 +99,26 @@ class BrowserSession:
 
             driver_init_error = None
 
+            def _get_system_chromedriver():
+                for path in ["/usr/bin/chromedriver", "/usr/local/bin/chromedriver", "/usr/lib/chromium-browser/chromedriver"]:
+                    if os.path.exists(path):
+                        return path
+                return shutil.which("chromedriver")
+
             def _init_driver(driver_cls, opts, sw_opts=None):
-                # Try built-in Selenium Manager first (supports system Chrome/Chromium v149+)
+                # Attempt 1: System-installed ChromeDriver (essential for Linux ARM64 / Raspberry Pi)
+                sys_driver = _get_system_chromedriver()
+                if sys_driver:
+                    try:
+                        log.info(f"Initializing Chrome using system ChromeDriver at: {sys_driver}")
+                        kwargs = {"service": Service(executable_path=sys_driver), "options": opts}
+                        if sw_opts is not None:
+                            kwargs["seleniumwire_options"] = sw_opts
+                        return driver_cls(**kwargs)
+                    except Exception as ex0:
+                        log.warning(f"System ChromeDriver init failed ({ex0}), trying built-in Selenium Manager...")
+
+                # Attempt 2: Built-in Selenium Manager
                 try:
                     kwargs = {"options": opts}
                     if sw_opts is not None:
