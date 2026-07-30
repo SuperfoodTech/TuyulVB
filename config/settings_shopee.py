@@ -5,24 +5,16 @@
 # Set to False for normal production runs to save disk space.
 SAVE_RAW_DATA_FOR_DEBUG = True
 
-# --- Monday.com Configuration ---
-MONDAY_BOARD_ID = 5006292952
+# --- Data Provider & Database Configuration ---
+# Options for DATA_PROVIDER_TYPE: 'hybrid', 'sheets', 'vercel', 'database', 'local_json'
+DATA_PROVIDER_TYPE = "hybrid"
+GOOGLE_SHEET_ID = "10osh4rI4q_mv6fBe9NurXRztRrGa85L01Bwned6m0Qs"
+VERCEL_API_URL = ""
+VERCEL_API_TOKEN = ""
 
-# Maps the 'output_name' from MERCHANT_PROCESSING_LIST to a specific Group ID on your Monday board.
-GROUP_MAPPING = {
-    "Foodnesia": "group_mkw46q72",
-    "WonderFood": "group_mks93rx3",
-    "Lokarasa": "group_mkw4rjmz",
-    "DoEat": "group_mkw45f1v",
-    "S1": "group_mkw4487b",
-    "H1": "group_mkw41eee",
-    "K1": "group_mkw4491t",
-    "E1": "group_mkw49hry",
-    "R1": "group_mkw42h0d",
-    "D1": "group_mkw4bad7",
-    "T1": "group_mkw4fjah",
-    "FM1": "group_mkw4cg1g",
-}
+# Database Backup Settings
+DATABASE_PATH = "data/db/tuyul_vb.db"
+ENABLE_DATABASE_BACKUP = True
 
 # ============================================================================
 # MERCHANT PROCESSING / MONDAY MAPPING CONFIGURATION
