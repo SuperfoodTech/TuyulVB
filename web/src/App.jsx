@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import NavHeader from "./components/NavHeader";
 import LoginModal from "./components/LoginModal";
 import MerchantDashboard from "./components/MerchantDashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import AuditLogsTab from "./components/AuditLogsTab";
 import SessionMonitorTab from "./components/SessionMonitorTab";
+import StarField from "./components/StarField";
 import { useTheme } from "./hooks/useTheme";
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState("merchant"); // merchant | admin | logs | sessions
+  const [activeTab, setActiveTab] = useState("merchant"); // merchant | admin | sessions | logs
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem("foodmaster_user");
     return saved ? JSON.parse(saved) : null;
@@ -20,7 +21,6 @@ export default function App() {
   const [apiConnected, setApiConnected] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // Compute API_BASE_URL
   const getApiBaseUrl = () => {
     if (import.meta.env.VITE_API_URL) {
       return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
@@ -54,7 +54,6 @@ export default function App() {
       .catch((err) => {
         console.warn("Backend API not reachable, loading fallback local outlets:", err);
         setApiConnected(false);
-        // Fallback sample data if API server is offline
         setOutlets([
           {
             store_id: "ST1001",
@@ -74,7 +73,7 @@ export default function App() {
             subscription_start: "2026-01-01",
             subscription_end: "2026-12-31",
             subscription_status: "Active",
-            last_checked_at: new Date().isoformat()
+            last_checked_at: new Date().toISOString()
           }
         ]);
       })
@@ -86,17 +85,12 @@ export default function App() {
   }, []);
 
   const handleToggleVercel = (storeId, newToggle, duration) => {
-    // Optimistic UI update
     setOutlets((prev) =>
       prev.map((o) => (o.store_id === storeId ? { ...o, vercel_toggle: newToggle } : o))
     );
-
     fetch(`${API_BASE_URL}/api/toggle`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": API_SECRET_KEY
-      },
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SECRET_KEY },
       body: JSON.stringify({ store_id: storeId, vercel_toggle: newToggle, duration })
     })
       .then((res) => res.json())
@@ -108,10 +102,7 @@ export default function App() {
     setSyncing(true);
     fetch(`${API_BASE_URL}/api/trigger-sync`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": API_SECRET_KEY
-      },
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SECRET_KEY },
       body: JSON.stringify({ dry_run: false })
     })
       .then((res) => res.json())
@@ -129,11 +120,7 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     localStorage.setItem("foodmaster_user", JSON.stringify(user));
-    if (user.role === "admin") {
-      setActiveTab("admin");
-    } else {
-      setActiveTab("merchant");
-    }
+    setActiveTab(user.role === "admin" ? "admin" : "merchant");
   };
 
   const handleLogout = () => {
@@ -144,8 +131,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#fff9f8] text-slate-900 dark:bg-black dark:text-white transition-colors duration-200">
-      
-      {/* Navigation Header */}
+      <StarField active={theme === "dark"} />
+
       <NavHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -159,50 +146,42 @@ export default function App() {
         syncing={syncing}
       />
 
-      {/* Main Container */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        
-        {activeTab === "merchant" && (
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className={activeTab === "merchant" ? "" : "hidden"}>
           <MerchantDashboard
             outlets={outlets}
             onToggleVercel={handleToggleVercel}
             onRefresh={fetchOutlets}
             loading={loading}
           />
-        )}
-
-        {activeTab === "admin" && (
+        </div>
+        <div className={activeTab === "admin" ? "" : "hidden"}>
           <AdminDashboard
             outlets={outlets}
             onUpdateOutlet={handleUpdateOutletAdmin}
             onRefresh={fetchOutlets}
             loading={loading}
           />
-        )}
-
-        {activeTab === "logs" && (
-          <AuditLogsTab
-            API_BASE_URL={API_BASE_URL}
-            API_SECRET_KEY={API_SECRET_KEY}
-          />
-        )}
-
-        {activeTab === "sessions" && (
+        </div>
+        <div className={activeTab === "sessions" ? "" : "hidden"}>
           <SessionMonitorTab
             API_BASE_URL={API_BASE_URL}
             API_SECRET_KEY={API_SECRET_KEY}
           />
-        )}
-
+        </div>
+        <div className={activeTab === "logs" ? "" : "hidden"}>
+          <AuditLogsTab
+            API_BASE_URL={API_BASE_URL}
+            API_SECRET_KEY={API_SECRET_KEY}
+          />
+        </div>
       </main>
 
-      {/* Login Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
-
     </div>
   );
 }
