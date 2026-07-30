@@ -122,19 +122,31 @@ def run_health_check():
 
     check_python_packages()
     log.info("-" * 80)
-    log.info("Checking Global Configurations...")
+    log.info("Checking Global & Data Provider Configurations...")
     env_path = os.path.join(PROJECT_ROOT, ".env")
-    if check(os.path.exists(env_path), ".env file found.", ".env file is missing."):
+    if os.path.exists(env_path):
         load_dotenv(dotenv_path=env_path, override=True)
-        check(
-            os.getenv("MONDAY_API_KEY"),
-            "MONDAY_API_KEY is present.",
-            "MONDAY_API_KEY is missing or empty in .env file.",
-        )
+        log.info("[OK] .env file loaded.")
+
+    provider_type = os.getenv("DATA_PROVIDER_TYPE", "hybrid")
+    log.info(f"[OK] Data Provider Type: '{provider_type}'")
+
     log.info("-" * 80)
     log.info("Checking Shopee Configurations...")
     check_module_vars("config.credentials_shopee", {"ACCOUNT_CREDS": dict})
-    check_module_vars("config.settings_shopee", {"MERCHANT_PROCESSING_LIST": list, "MONDAY_BOARD_ID": int})
+    check_module_vars("config.settings_shopee", {"MERCHANT_PROCESSING_LIST": list, "DATA_PROVIDER_TYPE": str})
+
+    log.info("-" * 80)
+    log.info("Testing Data Provider Initialization & Database Backup...")
+    try:
+        from common.data_provider import DataProviderFactory
+        provider = DataProviderFactory.create_provider()
+        outlets = provider.fetch_all_outlets()
+        log.info(f"[OK] Data Provider initialized. Loaded {len(outlets)} outlets.")
+    except Exception as e:
+        log.error(f"[FAIL] Data Provider initialization failed: {e}")
+        overall_ok = False
+
     log.info("=" * 80)
     if overall_ok:
         log.info("[OK] Health check passed! Configurations are in place.")
