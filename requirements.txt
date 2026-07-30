@@ -1,9 +1,11 @@
 # For web scraping and browser automation
 selenium
 selenium-wire
+pyOpenSSL<24.0.0
+cryptography<42.0.0
 blinker<1.8.0
 webdriver-manager
-setuptools
+setuptools<70.0.0
 
 # For data manipulation
 pandas
@@ -22,7 +24,9 @@ openpyxl
 # For scheduling tasks
 schedule
 
-# For Async API Client
+# For Async API Client & Server
 aiohttp
 cachetools
 PyJWT
+fastapi
+uvicorn

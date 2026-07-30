@@ -203,6 +203,30 @@ def run_single_bot_cycle():
         log.error(f"Error during single bot cycle execution: {e}")
 
 
+def run_interactive_login():
+    """Starts a visible browser session for the user to log in to Shopee Partner and save the session profile."""
+    log.info("🚀 Launching visible Chromium browser for Shopee Partner login...")
+    try:
+        from modules.shopee.browser_session import BrowserSession
+        session = BrowserSession(headless=False)
+        if not session.driver:
+            log.error("Failed to initialize browser session.")
+            return
+
+        session.driver.get("https://partner.business.accounts.shopee.co.id/authenticate/login/")
+        print("\n" + "=" * 80)
+        print(" [MANUAL LOGIN INSTRUCTIONS]")
+        print(" 1. Jendela Chromium telah terbuka secara visual.")
+        print(" 2. Silakan login (No HP / Email & OTP / Captcha) hingga masuk ke Dashboard Shopee Partner.")
+        print(" 3. Setelah berhasil masuk ke Dashboard, kembali ke terminal ini dan tekan Enter.")
+        print("=" * 80)
+        input("\nTekan Enter jika Anda sudah selesai login di browser...")
+        log.info("✅ Sesi login telah berhasil disimpan ke folder profile terisolasi ('chromeprofile').")
+        session.quit()
+    except Exception as e:
+        log.error(f"Error during interactive login: {e}")
+
+
 MENU_ITEMS = [
     {"name": "Run Health Check", "action": run_health_check, "is_script": False},
     {"name": "Inspect Live Outlet Statuses & Priority Matrix", "action": inspect_live_outlets, "is_script": False},
@@ -210,11 +234,9 @@ MENU_ITEMS = [
     {"name": "Run Single Auto Open / Auto Close Cycle", "action": run_single_bot_cycle, "is_script": False},
     {
         "name": "Shopee: Login Setup & Session Runner",
-        "path": os.path.join("modules", "shopee", "main_runner.py"),
-        "cwd": os.path.join(PROJECT_ROOT, "modules", "shopee"),
-        "args": ["--task", "extract_raw"],
-        "is_script": True,
-        "description": "Interactive runner for Shopee login setup and session initialization.",
+        "action": run_interactive_login,
+        "is_script": False,
+        "description": "Interactive runner for Shopee login setup and session initialization in chromeprofile.",
     },
     {
         "name": "Start REST API Server Bridge (Port 18800)",
