@@ -179,9 +179,11 @@ def main(task_name, dry_run=False, scale_level=1):
 
             if switch_successful:
                 if task_name == "force_open":
+                    from common.data_provider import DataProviderFactory
+                    provider = DataProviderFactory.create_provider()
                     task_function(
-                        browser_session,
-                        merchant_task,
+                        session=browser_session,
+                        data_provider=provider,
                         scale_level=scale_level,
                         dry_run=dry_run,
                     )
