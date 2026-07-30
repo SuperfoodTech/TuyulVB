@@ -1,14 +1,16 @@
 import { useState } from "react";
 import StarField from "./StarField";
 
-export default function MerchantTokenLoginPage({ theme, onToggleTheme, outletInfo, onLoginSuccess }) {
+export default function MerchantTokenLoginPage({ theme, onToggleTheme, outletInfo, merchantStores = [], onLoginSuccess }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const expectedUsername = (outletInfo.merchant_username || outletInfo.outlet_short_name || "").toLowerCase().trim();
+  const expectedUsername = (outletInfo.merchant_username || outletInfo.owner_name || outletInfo.outlet_short_name || "").toLowerCase().trim();
   const expectedPassword = outletInfo.merchant_password || "foodmaster123";
+
+  const storeCount = merchantStores.length || 1;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,9 +24,9 @@ export default function MerchantTokenLoginPage({ theme, onToggleTheme, outletInf
       if (enteredUser === expectedUsername && password === expectedPassword) {
         onLoginSuccess({
           role: "merchant",
-          name: outletInfo.outlet_short_name || outletInfo.portal_name,
-          portal: outletInfo.store_id,
-          store_id: outletInfo.store_id
+          name: outletInfo.owner_name || outletInfo.portal_name,
+          portal: outletInfo.merchant_id,
+          merchant_id: outletInfo.merchant_id
         });
       } else {
         setError("Username atau Password merchant salah. Silakan periksa kembali kredensial yang diberikan oleh Admin.");
@@ -59,23 +61,25 @@ export default function MerchantTokenLoginPage({ theme, onToggleTheme, outletInf
             FoodMaster Merchant
           </h1>
           <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
-            Verifikasi Keamanan Akses Toko
+            Verifikasi Keamanan Akses Akun Merchant
           </p>
         </div>
 
         {/* Card */}
         <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 space-y-4">
 
-          {/* Outlet Target Badge */}
+          {/* Merchant ID Target Badge */}
           <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3 text-left">
             <span className="text-[10px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400 block">
-              Akses Outlet Terverifikasi:
+              Akun Merchant Terverifikasi:
             </span>
             <p className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-              {outletInfo.outlet_long_name || outletInfo.outlet_short_name}
+              {outletInfo.owner_name || outletInfo.portal_name}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-              {outletInfo.portal_name} &bull; Store ID: <code className="font-mono">{outletInfo.store_id}</code>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-0.5">
+              Merchant ID: <code className="font-mono font-bold text-slate-800 dark:text-zinc-200">{outletInfo.merchant_id}</code>
+              <span>&bull;</span>
+              <span>{storeCount} Outlet Terdaftar</span>
             </p>
           </div>
 
@@ -137,7 +141,7 @@ export default function MerchantTokenLoginPage({ theme, onToggleTheme, outletInf
               disabled={isLoading}
               className="primary-action w-full py-3 text-xs gap-2"
             >
-              {isLoading ? "Memverifikasi..." : "Masuk ke Dashboard Outlet"}
+              {isLoading ? "Memverifikasi..." : "Masuk ke Dashboard Merchant"}
             </button>
           </form>
         </div>

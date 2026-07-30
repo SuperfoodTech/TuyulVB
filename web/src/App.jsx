@@ -15,15 +15,16 @@ import { getSubscriptionInfo } from "./utils/outletUtils";
 export default function App() {
   const { theme, toggleTheme } = useTheme();
 
-  // URL Query Parameters check (e.g. ?token=mcht_live_st1001_8f9a2b or ?merchant=ST1001)
+  // URL Query Parameters check (e.g. ?token=mcht_live_m101_8f9a2b or ?merchant=M101)
   const [tokenParam] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      return params.get("token") || params.get("merchant") || params.get("store");
+      return params.get("token") || params.get("merchant") || params.get("merchant_id") || params.get("store");
     }
     return null;
   });
 
+  const [targetMerchantOutlets, setTargetMerchantOutlets] = useState([]);
   const [targetOutlet, setTargetOutlet] = useState(null);
   const [isExpired, setIsExpired] = useState(false);
 
@@ -86,13 +87,36 @@ export default function App() {
             owner_name: "Merchant Foodnesia",
             portal_name: "Foodnesia Portal",
             outlet_long_name: "Foodnesia Outlet Utama",
-            outlet_short_name: "Foodnesia",
+            outlet_short_name: "Foodnesia Center",
             merchant_username: "foodnesia",
             merchant_password: "foodnesia123",
-            access_token: "mcht_live_st1001_8f9a2b",
+            access_token: "mcht_live_m101_8f9a2b",
             operating_days: "1,2,3,4,5,6,7",
             open_time: "08:00",
             close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "6 Bulan",
+            subscription_start: "2026-01-01",
+            subscription_end: "2026-12-31",
+            subscription_status: "Active",
+            last_checked_at: new Date().toISOString()
+          },
+          {
+            store_id: "ST1004",
+            merchant_id: "M101", // Toko ke-2 milik Merchant M101
+            owner_name: "Merchant Foodnesia",
+            portal_name: "Foodnesia Portal",
+            outlet_long_name: "Foodnesia Cabang Barat",
+            outlet_short_name: "Foodnesia Barat",
+            merchant_username: "foodnesia",
+            merchant_password: "foodnesia123",
+            access_token: "mcht_live_m101_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "09:00",
+            close_time: "23:00",
             vercel_toggle: true,
             shopee_toggle_last: true,
             suspension_status: false,
@@ -112,7 +136,7 @@ export default function App() {
             outlet_short_name: "WonderFood",
             merchant_username: "wonderfood",
             merchant_password: "wonderfood123",
-            access_token: "mcht_live_st1002_8f9a2b",
+            access_token: "mcht_live_m102_8f9a2b",
             operating_days: "1,2,3,4,5",
             open_time: "09:00",
             close_time: "21:00",
@@ -135,7 +159,7 @@ export default function App() {
             outlet_short_name: "Lokarasa",
             merchant_username: "lokarasa",
             merchant_password: "lokarasa123",
-            access_token: "mcht_live_st1003_8f9a2b",
+            access_token: "mcht_live_m103_8f9a2b",
             operating_days: "1,2,3,4,5,6,7",
             open_time: "10:00",
             close_time: "22:00",
@@ -156,40 +180,50 @@ export default function App() {
       .finally(() => setLoading(false));
   };
 
-  // Evaluasi link token khusus merchant dari URL query parameter
+  // Evaluasi link token khusus merchant (berbasis Merchant ID)
   const evaluateUrlToken = (allOutlets) => {
     if (!tokenParam) return;
 
-    const matched = allOutlets.find((o) => {
-      const q = tokenParam.toLowerCase();
+    const q = tokenParam.toLowerCase().trim();
+
+    // Match all stores belonging to this Merchant ID or Token
+    const matchedStores = allOutlets.filter((o) => {
+      const mId = o.merchant_id.toLowerCase();
       const token = (o.access_token || "").toLowerCase();
       const storeId = o.store_id.toLowerCase();
-      return token === q || storeId === q || (q.includes("st") && storeId.includes(q));
+      return mId === q || token === q || storeId === q || (q.includes("m") && mId.includes(q));
     });
 
-    if (!matched) {
+    if (matchedStores.length === 0) {
       setTargetOutlet({
         store_id: tokenParam,
-        portal_name: "Unknown Outlet",
-        reason: "Access Token link merchant tidak valid atau telah dicabut oleh Admin."
+        portal_name: "Unknown Merchant",
+        reason: "Access Token / Merchant ID link tidak valid atau telah dicabut oleh Admin."
       });
       setIsExpired(true);
       return;
     }
 
-    setTargetOutlet(matched);
-    const subInfo = getSubscriptionInfo(matched.subscription_end);
-    const expiredCheck = matched.subscription_status === "Expired" || subInfo.isExpired;
-    setIsExpired(expiredCheck);
+    const firstStore = matchedStores[0];
+    setTargetOutlet(firstStore);
+    setTargetMerchantOutlets(matchedStores);
+
+    // Check if ALL stores under this merchant are expired
+    const allExpired = matchedStores.every((s) => {
+      const subInfo = getSubscriptionInfo(s.subscription_end);
+      return s.subscription_status === "Expired" || subInfo.isExpired;
+    });
+
+    setIsExpired(allExpired);
   };
 
   useEffect(() => {
     fetchOutlets();
   }, [tokenParam]);
 
-  // Filtered outlets untuk Merchant View
+  // Filtered outlets untuk Merchant View — Tampilkan SEMUA outlet milik Merchant ID ini!
   const visibleOutlets = currentUser?.role === "merchant"
-    ? outlets.filter((o) => o.store_id === currentUser.store_id || o.store_id === currentUser.portal)
+    ? outlets.filter((o) => o.merchant_id === currentUser.merchant_id)
     : outlets;
 
   const handleToggleVercel = (storeId, newToggle, duration) => {
@@ -226,8 +260,13 @@ export default function App() {
   };
 
   const handleMerchantLoginSuccess = (user) => {
-    setCurrentUser(user);
-    localStorage.setItem("foodmaster_user", JSON.stringify(user));
+    // Session merchant menyimpan merchant_id
+    const merchantSession = {
+      ...user,
+      merchant_id: targetOutlet?.merchant_id
+    };
+    setCurrentUser(merchantSession);
+    localStorage.setItem("foodmaster_user", JSON.stringify(merchantSession));
   };
 
   const handleAdminLoginSuccess = (user) => {
@@ -257,14 +296,15 @@ export default function App() {
   }
 
   // =====================================================================
-  // RENDER CASE 2: Merchant Token Link — Valid Token, Needs Username/Password Login
+  // RENDER CASE 2: Merchant Token Link — Valid Merchant ID, Needs Login
   // =====================================================================
-  if (tokenParam && !isExpired && targetOutlet && (!currentUser || currentUser.store_id !== targetOutlet.store_id)) {
+  if (tokenParam && !isExpired && targetOutlet && (!currentUser || currentUser.merchant_id !== targetOutlet.merchant_id)) {
     return (
       <MerchantTokenLoginPage
         theme={theme}
         onToggleTheme={toggleTheme}
         outletInfo={targetOutlet}
+        merchantStores={targetMerchantOutlets}
         onLoginSuccess={handleMerchantLoginSuccess}
       />
     );
@@ -304,7 +344,7 @@ export default function App() {
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
-        {/* MERCHANT VIEW */}
+        {/* MERCHANT VIEW — Tampilkan SEMUA toko milik Merchant ID ini */}
         {currentUser.role === "merchant" && (
           <MerchantDashboard
             outlets={visibleOutlets}

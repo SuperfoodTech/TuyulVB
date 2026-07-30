@@ -41,14 +41,17 @@ export default function MerchantDashboard({ outlets, onToggleVercel, onRefresh, 
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    {currentUser.portal || currentUser.name}
+                    Merchant ID: {currentUser.merchant_id || currentUser.portal || "M101"}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                   Outlet Saya
+                  <span className="rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 text-xs px-2.5 py-0.5 font-bold">
+                    {outlets.length} Toko
+                  </span>
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-                  Kelola status buka/tutup outlet ShopeeFood Anda melalui <strong>Vercel Toggle</strong>.
+                  Kelola status operasional <strong>{outlets.length} outlet</strong> ShopeeFood Anda melalui <strong>Vercel Toggle</strong>.
                 </p>
               </>
             ) : (

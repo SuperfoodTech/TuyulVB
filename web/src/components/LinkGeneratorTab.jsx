@@ -10,8 +10,9 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
 
   const getMerchantTokenLink = (outlet) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const token = outlet.access_token || `mcht_live_${outlet.store_id.toLowerCase()}_8f9a2b`;
-    return `${origin}/?token=${token}`;
+    const mId = outlet.merchant_id.toLowerCase();
+    const token = outlet.access_token || `mcht_live_${mId}_8f9a2b`;
+    return `${origin}/?merchant=${outlet.merchant_id}`;
   };
 
   const handleCopyLink = (outlet) => {
@@ -26,7 +27,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
     const username = outlet.merchant_username || outlet.outlet_short_name.toLowerCase();
     const password = outlet.merchant_password || "foodmaster123";
 
-    const text = `*AKSES DASHBOARD SHOPEEFOOD AUTO OPEN/CLOSE*\nOutlet: ${outlet.outlet_long_name || outlet.outlet_short_name}\nLink: ${link}\nUsername: ${username}\nPassword: ${password}`;
+    const text = `*AKSES DASHBOARD SHOPEEFOOD AUTO OPEN/CLOSE*\nMerchant ID: ${outlet.merchant_id}\nPortal/Nama: ${outlet.portal_name || outlet.owner_name}\nLink: ${link}\nUsername: ${username}\nPassword: ${password}`;
     navigator.clipboard.writeText(text);
     setCopiedCredId(outlet.store_id);
     setTimeout(() => setCopiedCredId(null), 2500);
@@ -38,7 +39,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
       ...outlet,
       merchant_username: outlet.merchant_username || outlet.outlet_short_name.toLowerCase(),
       merchant_password: outlet.merchant_password || "foodmaster123",
-      access_token: outlet.access_token || `mcht_live_${outlet.store_id.toLowerCase()}_8f9a2b`
+      access_token: outlet.access_token || `mcht_live_${outlet.merchant_id.toLowerCase()}_8f9a2b`
     });
   };
 
@@ -51,6 +52,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
   const filteredOutlets = outlets.filter((o) => {
     const q = search.toLowerCase();
     return (
+      (o.merchant_id || "").toLowerCase().includes(q) ||
       (o.store_id || "").toLowerCase().includes(q) ||
       (o.portal_name || "").toLowerCase().includes(q) ||
       (o.outlet_short_name || "").toLowerCase().includes(q) ||
@@ -69,11 +71,11 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-              Manajemen Access Token &amp; Kredensial Merchant
+              Link Generator &amp; Access Control per Merchant ID
             </h2>
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-            Setiap merchant membutuhkan <strong>Token Link Unik + Username &amp; Password</strong> untuk masuk ke dashboard outlet. Akses akan terkunci otomatis jika subscription expired.
+            Setiap Merchant ID mendapatkan <strong>1 Link Khusus</strong> yang menampilkan seluruh outlet/toko milik merchant tersebut.
           </p>
         </div>
         <button
@@ -97,7 +99,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
         </span>
         <input
           type="text"
-          placeholder="Cari store ID, nama outlet, atau username merchant..."
+          placeholder="Cari Merchant ID, Store ID, nama outlet, atau portal..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="field-control pl-10"
@@ -110,10 +112,10 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
           <table className="w-full text-left text-[13px]">
             <thead className="bg-slate-50 dark:bg-zinc-900/60 text-[12px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 border-b border-red-50 dark:border-zinc-800">
               <tr>
-                <th className="px-4 py-3.5">Store ID / Outlet</th>
+                <th className="px-4 py-3.5">Merchant ID &amp; Outlet</th>
                 <th className="px-4 py-3.5">Username &amp; Password</th>
                 <th className="px-4 py-3.5">Status Subscription</th>
-                <th className="px-4 py-3.5">Token Link Akses</th>
+                <th className="px-4 py-3.5">Link Akses (Merchant ID)</th>
                 <th className="px-4 py-3.5 text-right">Aksi Admin</th>
               </tr>
             </thead>
@@ -128,15 +130,16 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
                 filteredOutlets.map((o) => {
                   const subInfo = getSubscriptionInfo(o.subscription_end);
                   const isSubActive = o.subscription_status === "Active" && !subInfo.isExpired;
-                  const tokenLink = getMerchantTokenLink(o);
+                  const merchantLink = getMerchantTokenLink(o);
                   const username = o.merchant_username || o.outlet_short_name.toLowerCase();
                   const password = o.merchant_password || "foodmaster123";
 
                   return (
                     <tr key={o.store_id} className="hover:bg-red-50/20 dark:hover:bg-zinc-900/40 transition-colors">
                       <td className="px-4 py-3.5">
-                        <span className="font-bold block text-slate-900 dark:text-white">{o.outlet_short_name || o.outlet_long_name}</span>
-                        <span className="text-slate-400 dark:text-zinc-500 font-mono text-[11px]">{o.store_id}</span>
+                        <span className="font-mono font-bold block text-red-700 dark:text-red-400">{o.merchant_id}</span>
+                        <span className="font-bold text-slate-900 dark:text-white block text-[13px]">{o.outlet_short_name || o.outlet_long_name}</span>
+                        <span className="text-slate-400 dark:text-zinc-500 font-mono text-[11px]">Store ID: {o.store_id}</span>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-[12px]">
                         <div>User: <span className="font-bold text-slate-800 dark:text-white">{username}</span></div>
@@ -167,7 +170,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
                         <input
                           type="text"
                           readOnly
-                          value={tokenLink}
+                          value={merchantLink}
                           className="w-52 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 truncate"
                         />
                       </td>
@@ -180,7 +183,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
                               ? "bg-emerald-600 text-white"
                               : "bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700"
                           }`}
-                          title="Salin Link + Username + Password sekaligus"
+                          title="Salin Link + Username + Password"
                         >
                           {copiedCredId === o.store_id ? "Tersalin!" : "Salin Info Login"}
                         </button>
@@ -223,7 +226,7 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
           <div className="animate-scale-up w-full max-w-md rounded-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-zinc-800 pb-3">
               <h3 className="font-bold text-slate-800 dark:text-white">
-                Edit Kredensial: {formData.outlet_short_name}
+                Edit Kredensial Merchant ID: {formData.merchant_id}
               </h3>
               <button
                 type="button"
