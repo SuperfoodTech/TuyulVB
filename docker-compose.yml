@@ -7,11 +7,15 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "18800:18800"
     environment:
       - TZ=Asia/Jakarta
       - HEADLESS_MODE=True
       - DATA_PROVIDER_TYPE=hybrid
       - DATABASE_PATH=data/db/tuyul_vb.db
+      - API_PORT=18800
+      - API_SECRET_KEY=foodmaster-secret-api-key-2026
     volumes:
       # Persistent isolated Chromium browser profile & session login
       - ./chromeprofile:/app/chromeprofile
