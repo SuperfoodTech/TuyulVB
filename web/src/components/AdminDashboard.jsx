@@ -1,13 +1,22 @@
 import { useState } from "react";
-import { formatOperatingDays, formatOperatingDaysFull, formatDateID, getSubscriptionInfo } from "../utils/outletUtils";
+import { formatOperatingDays, formatDateID, getSubscriptionInfo, getTodayOperatingHours } from "../utils/outletUtils";
+import ScheduleModal from "./ScheduleModal";
 
 export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loading }) {
   const [editingStoreId, setEditingStoreId] = useState(null);
   const [formData, setFormData] = useState({});
+  const [viewScheduleOutlet, setViewScheduleOutlet] = useState(null);
 
   const handleEditClick = (outlet) => {
     setEditingStoreId(outlet.store_id);
-    setFormData({ ...outlet });
+    setFormData({
+      ...outlet,
+      open_time: outlet.open_time || "08:00",
+      close_time: outlet.close_time || "22:00",
+      operating_days: outlet.operating_days || "1,2,3,4,5,6,7",
+      friday_open_time: outlet.friday_open_time || "",
+      weekend_open_time: outlet.weekend_open_time || ""
+    });
   };
 
   const handleSave = (e) => {
@@ -32,7 +41,7 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
               </h2>
             </div>
             <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-              Kelola <strong>Status Penangguhan</strong>, <strong>Masa Aktif Subscription</strong>, dan pendaftaran outlet ShopeeFood.
+              Kelola <strong>Status Penangguhan</strong>, <strong>Jam Operasional Master</strong>, dan <strong>Masa Aktif Subscription</strong> outlet.
             </p>
           </div>
           <button
@@ -74,6 +83,7 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                 const isSusp = o.suspension_status === true || o.suspension_status === "Ya";
                 const isSubActive = o.subscription_status === "Active";
                 const subInfo = getSubscriptionInfo(o.subscription_end);
+                const todayInfo = getTodayOperatingHours(o);
 
                 return (
                   <tr key={o.store_id} className="hover:bg-red-50/30 dark:hover:bg-zinc-900/40 transition-colors">
@@ -85,27 +95,28 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                       <span className="font-bold block text-slate-900 dark:text-white">{o.outlet_short_name || o.outlet_long_name}</span>
                       <span className="text-slate-400 dark:text-zinc-500 text-[11px]">{o.portal_name || "FoodMaster"}</span>
                     </td>
+
+                    {/* JAM OPERASIONAL: Hari ini + Lihat Jadwal 7 Hari */}
                     <td className="px-4 py-3.5">
                       <div className="space-y-1">
-                        {/* Hari Operasional */}
-                        <span
-                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-700 dark:text-zinc-300"
-                          title={formatOperatingDaysFull(o.operating_days)}
-                        >
-                          <svg className="h-3 w-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {formatOperatingDays(o.operating_days)}
-                        </span>
-                        {/* Jam Buka */}
-                        <span className="flex items-center gap-1 text-[12px] text-slate-500 dark:text-zinc-500">
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-800 dark:text-zinc-200">
+                          <svg className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          {o.open_time || "08:00"} – {o.close_time || "22:00"}
+                          Hari Ini ({todayInfo.todayName}): {todayInfo.hoursText}
                         </span>
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setViewScheduleOutlet(o)}
+                            className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center gap-1 transition-colors"
+                          >
+                            Lihat Jadwal 7 Hari &rsaquo;
+                          </button>
+                        </div>
                       </div>
                     </td>
+
                     <td className="px-4 py-3.5">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                         o.vercel_toggle
@@ -126,7 +137,6 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="space-y-1.5">
-                        {/* Paket + Status */}
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                           isSubActive
                             ? subInfo.isExpiringSoon
@@ -140,17 +150,14 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                             "✕ Expired"
                           )}
                         </span>
-                        {/* Paket */}
                         <div className="text-[12px] font-semibold text-slate-700 dark:text-zinc-300">
                           {o.subscription_package || "3 Bulan"}
                         </div>
-                        {/* Rentang Tanggal */}
                         <div className="text-[11.5px] text-slate-500 dark:text-zinc-500">
                           <span>{formatDateID(o.subscription_start)}</span>
                           <span className="mx-1 text-slate-300 dark:text-zinc-600">→</span>
                           <span>{formatDateID(o.subscription_end)}</span>
                         </div>
-                        {/* Sisa Hari */}
                         {subInfo.daysLeft !== null && (
                           <div className={`text-[11px] font-bold ${
                             subInfo.isExpired
@@ -185,11 +192,11 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
         </div>
       </div>
 
-      {/* Edit Admin Modal */}
+      {/* Edit Admin Modal (Terdapat Pengaturan Jam Operasional Master) */}
       {editingStoreId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="animate-scale-up w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-950 border border-red-100 dark:border-zinc-800 p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-red-50 dark:border-zinc-800 pb-3">
+          <div className="animate-scale-up w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-950 border border-red-100 dark:border-zinc-800 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-red-50 dark:border-zinc-800 pb-3 sticky top-0 bg-white dark:bg-zinc-950 z-10">
               <h3 className="font-bold text-slate-800 dark:text-white">
                 Pengaturan Admin: {formData.outlet_short_name}
               </h3>
@@ -243,6 +250,80 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                 </div>
               </div>
 
+              {/* Pengaturan Jam Operasional Master */}
+              <div className="rounded-xl bg-slate-50 dark:bg-zinc-900/60 p-3.5 border border-slate-200 dark:border-zinc-800 space-y-3">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <label className="block font-bold text-slate-800 dark:text-white">
+                    Pengaturan Jam Operasional Master (Source of Truth):
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 dark:text-zinc-400 font-semibold mb-1">
+                    Hari Operasional Aktif (Format: 1,2,3,4,5,6,7):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="1,2,3,4,5,6,7 (1=Senin s/d 7=Minggu)"
+                    value={formData.operating_days || "1,2,3,4,5,6,7"}
+                    onChange={(e) => setFormData({ ...formData, operating_days: e.target.value })}
+                    className="field-control font-mono"
+                  />
+                  <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+                    Isikan ID hari dipisahkan koma. Ketik `1,2,3,4,5,6,7` untuk buka setiap hari.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-slate-600 dark:text-zinc-400 font-semibold mb-1">Jam Buka Standar:</label>
+                    <input
+                      type="text"
+                      placeholder="08:00"
+                      value={formData.open_time || "08:00"}
+                      onChange={(e) => setFormData({ ...formData, open_time: e.target.value })}
+                      className="field-control font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 dark:text-zinc-400 font-semibold mb-1">Jam Tutup Standar:</label>
+                    <input
+                      type="text"
+                      placeholder="22:00"
+                      value={formData.close_time || "22:00"}
+                      onChange={(e) => setFormData({ ...formData, close_time: e.target.value })}
+                      className="field-control font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 dark:border-zinc-800">
+                  <div>
+                    <label className="block text-slate-500 dark:text-zinc-400 text-[11.5px] mb-1">Jam Buka Jumat (Khusus Siang):</label>
+                    <input
+                      type="text"
+                      placeholder="Misal: 13:00 (Opsional)"
+                      value={formData.friday_open_time || ""}
+                      onChange={(e) => setFormData({ ...formData, friday_open_time: e.target.value })}
+                      className="field-control font-mono text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 dark:text-zinc-400 text-[11.5px] mb-1">Jam Buka Weekend (Sabtu-Minggu):</label>
+                    <input
+                      type="text"
+                      placeholder="Misal: 07:00 (Opsional)"
+                      value={formData.weekend_open_time || ""}
+                      onChange={(e) => setFormData({ ...formData, weekend_open_time: e.target.value })}
+                      className="field-control font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Subscription */}
               <div className="rounded-xl bg-slate-50 dark:bg-zinc-900/60 p-3.5 border border-slate-200 dark:border-zinc-800 space-y-2">
                 <label className="block font-bold text-slate-800 dark:text-white">
@@ -293,6 +374,14 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL: ScheduleModal (Detail 7 Hari Lengkap untuk Admin) */}
+      {viewScheduleOutlet && (
+        <ScheduleModal
+          outlet={viewScheduleOutlet}
+          onClose={() => setViewScheduleOutlet(null)}
+        />
       )}
     </div>
   );
