@@ -217,6 +217,13 @@ MENU_ITEMS = [
         "description": "Interactive runner for Shopee login setup and session initialization.",
     },
     {
+        "name": "Start REST API Server Bridge (Port 18800)",
+        "path": "api_server.py",
+        "cwd": PROJECT_ROOT,
+        "is_script": True,
+        "description": "REST API Server bridge for Vercel Web Dashboard (/api/outlets, /api/sessions, /api/logs, /api/toggle).",
+    },
+    {
         "name": "Shopee: Automated Force Open Scheduler",
         "path": os.path.join("modules", "shopee", "force_open", "scheduler.py"),
         "cwd": PROJECT_ROOT,
