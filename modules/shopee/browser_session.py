@@ -198,25 +198,93 @@ class BrowserSession:
             log.critical(f"Failed to initialize browser session: {e}")
             self.driver = None
 
-    def ensure_logged_in(self):
-        """
-        Checks if the current page is the login page, and if so, attempts to re-login.
-        This is useful to call before navigating to a page that requires authentication.
-        """
+    def check_session_health(self) -> bool:
+        """Verifies if the Selenium driver instance is active and responsive."""
+        if not self.driver:
+            return False
+        try:
+            _ = self.driver.current_url
+            return True
+        except Exception as e:
+            log.warning(f"Browser driver health check failed: {e}")
+            return False
+
+    def reconnect_driver(self) -> bool:
+        """Re-initializes the driver if it crashed or disconnected."""
+        log.info("Attempting to reconnect / re-initialize browser driver...")
+        if self.driver:
+            try:
+                self.driver.quit()
+            except Exception:
+                pass
+        self.__init__(headless=self.headless)
+        return self.check_session_health()
+
+    def check_staff_access_revoked(self) -> tuple[bool, str]:
+        """Checks if staff access has been revoked or denied by merchant on ShopeePartner."""
+        if not self.check_session_health():
+            return False, "Driver inactive"
         try:
             current_url = self.driver.current_url
-            if "/authenticate/login" in current_url:
-                log.warning(
-                    "  Session expired or redirected to login page. Attempting to re-login..."
-                )
-                # Get the master account from credentials to re-login
-                master_account_name = list(ACCOUNT_CREDS.keys())[0]
-                creds = ACCOUNT_CREDS[master_account_name]
-                return self.login(master_account_name, creds)
-            return True  # Already logged in
+            page_source = self.driver.page_source.lower()
+            revoked_keywords = ["akses ditolak", "access denied", "unauthorized", "staff access revoked", "tidak memiliki akses"]
+
+            for kw in revoked_keywords:
+                if kw in page_source:
+                    msg = f"Staff access revoked or unauthorized detected on page: '{kw}'"
+                    log.error(f"[ALERT] {msg}")
+                    return True, msg
+            return False, "OK"
         except Exception as e:
-            log.error(f"  An error occurred during login check: {e}")
-            return False
+            return False, str(e)
+
+    def ensure_logged_in(self, max_retries: int = 3) -> bool:
+        """
+        Checks if the current page is valid and logged in.
+        Retries up to max_retries with backoff if disconnected or session expired.
+        """
+        for attempt in range(1, max_retries + 1):
+            log.info(f"Checking browser session (Attempt {attempt}/{max_retries})...")
+            if not self.check_session_health():
+                log.warning("Browser driver is down. Reconnecting...")
+                if not self.reconnect_driver():
+                    time.sleep(2 * attempt)
+                    continue
+
+            revoked, rev_reason = self.check_staff_access_revoked()
+            if revoked:
+                log.error(f"[STAFF_REVOKED] {rev_reason}")
+                return False
+
+            try:
+                current_url = self.driver.current_url
+                if "/food/dashboard" in current_url:
+                    log.info("Session active. Currently on ShopeePartner Dashboard.")
+                    return True
+
+                if "/authenticate/login" in current_url or "/login" in current_url or "login" in current_url:
+                    log.warning("Session expired or redirected to login page. Attempting login...")
+                    if ACCOUNT_CREDS:
+                        master_account_name = list(ACCOUNT_CREDS.keys())[0]
+                        creds = ACCOUNT_CREDS[master_account_name]
+                        if self.login(master_account_name, creds):
+                            return True
+                    else:
+                        log.warning("No ACCOUNT_CREDS configured. Cannot perform auto-login.")
+                        return False
+
+                # Navigate to dashboard to test session
+                self.driver.get("https://partner.shopee.co.id/food/dashboard")
+                time.sleep(2)
+                if "/food/dashboard" in self.driver.current_url:
+                    return True
+            except Exception as e:
+                log.error(f"Error during login check: {e}")
+
+            time.sleep(2 * attempt)
+
+        log.error("Failed to ensure logged in session after maximum retries.")
+        return False
 
     def login(self, account_name, creds):
         if self.current_account == account_name:
