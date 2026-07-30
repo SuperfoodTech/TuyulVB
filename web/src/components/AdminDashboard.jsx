@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatOperatingDays, formatOperatingDaysFull, formatDateID, getSubscriptionInfo } from "../utils/outletUtils";
 
 export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loading }) {
   const [editingStoreId, setEditingStoreId] = useState(null);
@@ -72,6 +73,7 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
               {outlets.map((o) => {
                 const isSusp = o.suspension_status === true || o.suspension_status === "Ya";
                 const isSubActive = o.subscription_status === "Active";
+                const subInfo = getSubscriptionInfo(o.subscription_end);
 
                 return (
                   <tr key={o.store_id} className="hover:bg-red-50/30 dark:hover:bg-zinc-900/40 transition-colors">
@@ -84,12 +86,25 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                       <span className="text-slate-400 dark:text-zinc-500 text-[11px]">{o.portal_name || "FoodMaster"}</span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1 font-medium">
-                        <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {o.open_time || "08:00"} - {o.close_time || "22:00"}
-                      </span>
+                      <div className="space-y-1">
+                        {/* Hari Operasional */}
+                        <span
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-700 dark:text-zinc-300"
+                          title={formatOperatingDaysFull(o.operating_days)}
+                        >
+                          <svg className="h-3 w-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {formatOperatingDays(o.operating_days)}
+                        </span>
+                        {/* Jam Buka */}
+                        <span className="flex items-center gap-1 text-[12px] text-slate-500 dark:text-zinc-500">
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {o.open_time || "08:00"} – {o.close_time || "22:00"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
@@ -110,16 +125,46 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                        isSubActive
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                          : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
-                      }`}>
-                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        {o.subscription_package || "3 Bulan"} ({isSubActive ? "Aktif" : "Expired"})
-                      </span>
+                      <div className="space-y-1.5">
+                        {/* Paket + Status */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          isSubActive
+                            ? subInfo.isExpiringSoon
+                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+                        }`}>
+                          {isSubActive ? (
+                            subInfo.isExpiringSoon ? "⚠ Hampir Expired" : "✓ Aktif"
+                          ) : (
+                            "✕ Expired"
+                          )}
+                        </span>
+                        {/* Paket */}
+                        <div className="text-[12px] font-semibold text-slate-700 dark:text-zinc-300">
+                          {o.subscription_package || "3 Bulan"}
+                        </div>
+                        {/* Rentang Tanggal */}
+                        <div className="text-[11.5px] text-slate-500 dark:text-zinc-500">
+                          <span>{formatDateID(o.subscription_start)}</span>
+                          <span className="mx-1 text-slate-300 dark:text-zinc-600">→</span>
+                          <span>{formatDateID(o.subscription_end)}</span>
+                        </div>
+                        {/* Sisa Hari */}
+                        {subInfo.daysLeft !== null && (
+                          <div className={`text-[11px] font-bold ${
+                            subInfo.isExpired
+                              ? "text-red-600 dark:text-red-400"
+                              : subInfo.isExpiringSoon
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-slate-400 dark:text-zinc-500"
+                          }`}>
+                            {subInfo.isExpired
+                              ? `Kadaluarsa ${Math.abs(subInfo.daysLeft)} hari lalu`
+                              : `Sisa ${subInfo.daysLeft} hari`}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button
