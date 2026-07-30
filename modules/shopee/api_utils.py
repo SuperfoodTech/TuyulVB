@@ -132,15 +132,17 @@ def get_auth_tokens(driver, merchant_name: str = None, return_json: bool = False
 
     tob_token, entity_id = extract_tokens_from_driver(driver)
 
-    # Retry once if token not found
+    # Retry with Chrome Profile Auto-Login Recovery if token not found (matching get menu outlet behavior)
     if not tob_token:
-        log.warning("tob_token not found in cookies. Refreshing page and retrying...")
+        log.warning("tob_token not found in cookies. Attempting Chrome profile auto-login recovery...")
         try:
-            driver.refresh()
+            driver.get("https://partner.shopee.co.id/")
+            time.sleep(5)
+            driver.get("https://partner.shopee.co.id/settings/shopee-food/business-hours-settings")
             time.sleep(5)
             tob_token, entity_id = extract_tokens_from_driver(driver)
         except Exception as e:
-            log.error(f"Error during refresh: {e}")
+            log.error(f"Error during Chrome profile auto-login recovery: {e}")
 
     if tob_token:
         log.info("Fresh tokens extracted successfully.")

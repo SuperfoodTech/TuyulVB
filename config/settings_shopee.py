@@ -1,4 +1,5 @@
 # settings.py
+import os
 
 # --- Debugging and Output Configuration ---
 # Set to True to save the raw, uncleaned data from scrapers into a JSON file for debugging.
@@ -61,6 +62,15 @@ MERCHANT_PROCESSING_LIST = [
         "output_name": "DoEat",
     },
 ]
+
+# Monday Board & Group Mapping
+MONDAY_BOARD_ID = os.environ.get("MONDAY_BOARD_ID", "1234567890")
+GROUP_MAPPING = {
+    "Foodnesia": "group_foodnesia",
+    "WonderFood": "group_wonderfood",
+    "Lokarasa": "group_lokarasa",
+    "DoEat": "group_doeat",
+}
 
 # --- API Configuration ---
 COOKIE_CACHE_TTL = 3600
