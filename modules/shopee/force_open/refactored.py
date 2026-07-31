@@ -53,16 +53,17 @@ def process_store_via_api(store_id: str, short_name: str, action: str, tob_token
     """Executes Store Open or Close action via Shopee TOB API."""
     headers = get_shopee_headers(tob_token, entity_id)
 
+    parsed_store_id = int(store_id) if str(store_id).isdigit() else store_id
     try:
         if action == "OPEN":
             url = f"{SHOPEE_API_BASE}/api/seller/store/opening-status/action/open"
             log.debug(f"[API_CALL] Executing OPEN for {short_name} (ID: {store_id})")
-            response = requests.post(url, json={}, headers=headers, timeout=API_TIMEOUT)
+            response = requests.post(url, json={"store_id": parsed_store_id}, headers=headers, timeout=API_TIMEOUT)
         else:  # CLOSE / PAUSE
             url = f"{SHOPEE_API_BASE}/api/seller/store/opening-status/action/pause"
             log.debug(f"[API_CALL] Executing PAUSE/CLOSE for {short_name} (ID: {store_id})")
             response = requests.post(
-                url, json={"close_all_day": True}, headers=headers, timeout=API_TIMEOUT
+                url, json={"close_all_day": True, "store_id": parsed_store_id}, headers=headers, timeout=API_TIMEOUT
             )
 
         data = response.json()
