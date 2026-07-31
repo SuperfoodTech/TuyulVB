@@ -74,7 +74,7 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Lokasi Eksekusi: <strong className="text-slate-700 dark:text-zinc-300">Server Local / API Bridge (Port 18800)</strong> &bull; Evaluasi Periodik setiap <strong>15 menit</strong> &amp; Auto-Sync Instant.
+              Lokasi Eksekusi: <strong className="text-slate-700 dark:text-zinc-300">Server Local / API Bridge (Port 8000)</strong> &bull; Evaluasi Periodik setiap <strong>15 menit</strong> &amp; Auto-Sync Instant.
             </p>
           </div>
 

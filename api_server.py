@@ -31,12 +31,12 @@ from modules.shopee.force_open.refactored import run_force_open
 
 log = get_logger("api_server")
 
-API_PORT = int(os.environ.get("API_PORT", 18800))
+API_PORT = int(os.environ.get("PORT", os.environ.get("API_PORT", 8000)))
 API_SECRET_KEY = os.environ.get("API_SECRET_KEY", "foodmaster-secret-api-key-2026")
 
 app = FastAPI(
-    title="FoodMaster Auto Open & Auto Close Bot API",
-    description="REST API Server bridge compatible with Vercel Web Dashboard",
+    title="Auto-OC Bot & REST API Server Suite",
+    description="Unified REST API Server & Auto Open/Auto Close Bot Scheduler",
     version="1.0.0"
 )
 
@@ -48,6 +48,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def start_integrated_scheduler():
+    """Starts the Auto-OC ForceOpenScheduler in a background daemon thread."""
+    try:
+        from modules.shopee.force_open.scheduler import ForceOpenScheduler
+        def _scheduler_thread():
+            log.info("🤖 Starting Integrated Auto-OC Bot Scheduler Thread...")
+            scheduler = ForceOpenScheduler()
+            scheduler.start()
+
+        t = threading.Thread(target=_scheduler_thread, daemon=True, name="AutoOCBotSchedulerThread")
+        t.start()
+        log.info("✅ Integrated Auto-OC Bot Scheduler background thread initiated.")
+    except Exception as e:
+        log.error(f"❌ Failed to start integrated bot scheduler thread: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    start_integrated_scheduler()
 
 
 async def verify_api_key(request: Request, x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
@@ -70,7 +91,7 @@ async def health_check():
     return {
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
-        "service": "FoodMaster Bot API Server"
+        "service": "Auto-OC Bot & REST API Server Suite"
     }
 
 

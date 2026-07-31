@@ -239,25 +239,18 @@ MENU_ITEMS = [
         "description": "Interactive runner for Shopee login setup and session initialization in chromeprofile.",
     },
     {
-        "name": "Start REST API Server Bridge (Port 18800)",
+        "name": "Start Unified Auto-OC Backend API & Bot Scheduler (Port 8000)",
         "path": "api_server.py",
         "cwd": PROJECT_ROOT,
         "is_script": True,
-        "description": "REST API Server bridge for Vercel Web Dashboard (/api/outlets, /api/sessions, /api/logs, /api/toggle).",
-    },
-    {
-        "name": "Shopee: Automated Force Open Scheduler",
-        "path": os.path.join("modules", "shopee", "force_open", "scheduler.py"),
-        "cwd": PROJECT_ROOT,
-        "is_script": True,
-        "description": "Automated scheduler for force opening/closing Shopee stores based on Vercel Toggle & Priority Engine.",
+        "description": "Runs both REST API Server (Port 8000) & Background Auto Open/Close Bot Scheduler concurrently.",
     },
 ]
 
 
 def display_menu():
     print("\n" + "=" * 80)
-    print("=== FoodMaster Auto Open & Auto Close Bot Suite ===")
+    print("=== Auto-OC Bot & REST API Server Suite ===")
     print("=" * 80)
     for i, item in enumerate(MENU_ITEMS):
         print(f"  {i+1}. {item['name']}")

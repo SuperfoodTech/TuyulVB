@@ -35,5 +35,8 @@ COPY . /app/
 # Ensure data and chromeprofile directories exist
 RUN mkdir -p /app/data /app/chromeprofile
 
-# Default command: Run automated scheduler
-CMD ["python3", "modules/shopee/force_open/scheduler.py"]
+# Expose REST API port
+EXPOSE 8000
+
+# Default command: Run unified REST API Server & Auto-OC Bot Scheduler
+CMD ["python3", "api_server.py"]
