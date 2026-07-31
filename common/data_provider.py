@@ -170,6 +170,10 @@ class BaseDataProvider(ABC):
         """Updates Vercel Toggle state for a store."""
         pass
 
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        """Updates general fields of an outlet (schedule, suspension, sub, etc)."""
+        return False
+
 
 class LocalJsonDataProvider(BaseDataProvider):
     """Data provider backed by a local JSON file (data/outlets.json)."""
@@ -263,23 +267,53 @@ class LocalJsonDataProvider(BaseDataProvider):
             log.error(f"Failed to update vercel toggle in JSON provider: {e}")
             return False
 
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        try:
+            with open(self.file_path, "r") as f:
+                items = json.load(f)
+
+            updated = False
+            for item in items:
+                if str(item.get("store_id")) == str(store_id):
+                    item.update(updates)
+                    item["last_checked_at"] = datetime.now().isoformat()
+                    updated = True
+                    break
+
+            if updated:
+                with open(self.file_path, "w") as f:
+                    json.dump(items, f, indent=4)
+                return True
+            return False
+        except Exception as e:
+            log.error(f"Failed to update outlet in JSON provider: {e}")
+            return False
+
 
 class GoogleSheetsDataProvider(BaseDataProvider):
     """
     Data Provider backed by Google Sheets DB.
-    Supports CSV export endpoint parsing as well as Service Account / API Key.
+    Supports CSV export endpoint parsing as well as Published Web CSV URLs.
     """
 
-    def __init__(self, sheet_id: str, csv_url: Optional[str] = None):
+    def __init__(self, sheet_id: str = "", csv_url: Optional[str] = None):
         self.sheet_id = sheet_id
-        self.csv_url = csv_url or f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
+        if csv_url:
+            self.csv_url = csv_url
+        elif sheet_id and sheet_id.startswith("http"):
+            self.csv_url = sheet_id
+        elif sheet_id and "pub?output=csv" in sheet_id:
+            self.csv_url = sheet_id
+        else:
+            sheet_clean = sheet_id or os.getenv("GOOGLE_SHEET_ID", "")
+            self.csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_clean}/gviz/tq?tqx=out:csv"
         self.local_cache_provider = LocalJsonDataProvider()
 
     def fetch_all_outlets(self) -> List[OutletData]:
-        log.info(f"Fetching outlet data from Google Sheets (ID: {self.sheet_id})...")
+        log.info(f"Fetching outlet data from Google Sheets CSV URL...")
         try:
             resp = requests.get(self.csv_url, timeout=15)
-            if resp.status_code == 200 and "csv" in resp.headers.get("Content-Type", ""):
+            if resp.status_code == 200:
                 import csv
                 from io import StringIO
 
@@ -287,32 +321,68 @@ class GoogleSheetsDataProvider(BaseDataProvider):
                 reader = csv.DictReader(f)
                 outlets = []
                 for row in reader:
-                    # Map CSV column headers to OutletData fields
+                    clean_row = {str(k).strip(): str(v).strip() for k, v in row.items() if k}
+                    store_id = clean_row.get("Store ID") or clean_row.get("store_id", "")
+                    if not store_id:
+                        continue
+
+                    # Dynamic parsing of status & values from Google Sheets CSV
+                    susp_raw = str(clean_row.get("Penangguhan (Ya/Tidak)") or clean_row.get("Status Penangguhan", "Tidak")).strip().lower()
+                    sub_raw = str(clean_row.get("Status Langganan (Aktif/Kedaluwarsa)") or clean_row.get("Status Subscription", "")).strip().lower()
+                    main_status_raw = str(clean_row.get("Status Utama (Open/Close)") or clean_row.get("Vercel Toggle", "ON")).strip().lower()
+                    actual_status_raw = str(clean_row.get("Status Aktual (Open/Busy/Close)") or clean_row.get("Shopee Toggle Terakhir", "ON")).strip().lower()
+
+                    sub_start = clean_row.get("Tanggal Mulai Layanan") or clean_row.get("Tanggal Mulai Subscription", "")
+                    sub_end = clean_row.get("Tanggal Berakhir Layanan") or clean_row.get("Tanggal Berakhir Subscription", "")
+
+                    # Dynamic Subscription Status Evaluation based on Tanggal Berakhir Layanan
+                    subscription_status = "Active"
+                    if sub_raw in ["kedaluwarsa", "expired", "false", "0"]:
+                        subscription_status = "Expired"
+                    elif sub_end:
+                        try:
+                            end_dt = datetime.strptime(sub_end.strip()[:10], "%Y-%m-%d")
+                            if datetime.now() > end_dt:
+                                subscription_status = "Expired"
+                            else:
+                                subscription_status = "Active"
+                        except ValueError:
+                            pass
+
                     d = {
-                        "store_id": row.get("Store ID") or row.get("store_id", ""),
-                        "merchant_id": row.get("Merchant ID") or row.get("merchant_id", ""),
-                        "owner_name": row.get("Nama Pemilik") or row.get("owner_name", ""),
-                        "portal_name": row.get("Nama Portal") or row.get("portal_name", ""),
-                        "outlet_long_name": row.get("Nama Panjang Outlet") or row.get("outlet_long_name", ""),
-                        "outlet_short_name": row.get("Nama Pendek Outlet") or row.get("outlet_short_name", ""),
-                        "operating_days": row.get("Hari Operasional") or row.get("operating_days", "1,2,3,4,5,6,7"),
-                        "open_time": row.get("Jam Buka") or row.get("open_time", "00:00"),
-                        "close_time": row.get("Jam Tutup") or row.get("close_time", "23:59"),
-                        "vercel_toggle": row.get("Vercel Toggle", "ON"),
-                        "shopee_toggle_last": row.get("Shopee Toggle Terakhir", "ON"),
-                        "suspension_status": row.get("Status Penangguhan", "Tidak"),
-                        "suspension_reason": row.get("Alasan Penangguhan", ""),
-                        "subscription_package": row.get("Paket Subscription", ""),
-                        "subscription_start": row.get("Tanggal Mulai Subscription", ""),
-                        "subscription_end": row.get("Tanggal Berakhir Subscription", ""),
-                        "subscription_status": row.get("Status Subscription", "Active"),
+                        "store_id": store_id,
+                        "merchant_id": clean_row.get("Merchant ID") or clean_row.get("merchant_id", ""),
+                        "owner_name": clean_row.get("Nama Pemilik") or clean_row.get("owner_name", ""),
+                        "portal_name": clean_row.get("Nama Portal") or clean_row.get("portal_name", ""),
+                        "outlet_long_name": clean_row.get("Nama Panjang Outlet") or clean_row.get("outlet_long_name", ""),
+                        "outlet_short_name": clean_row.get("Nama Pendek Outlet") or clean_row.get("outlet_short_name", ""),
+                        "merchant_username": clean_row.get("Akses Username") or clean_row.get("merchant_username", ""),
+                        "merchant_password": clean_row.get("Akses Kata Sandi") or clean_row.get("merchant_password", ""),
+                        "access_token": f"mcht_live_{clean_row.get('Merchant ID', '')}_8f9a2b",
+                        "operating_days": clean_row.get("Hari Operasional") or clean_row.get("operating_days", "1,2,3,4,5,6,7"),
+                        "open_time": clean_row.get("Jam Buka") or clean_row.get("open_time", "08:00"),
+                        "close_time": clean_row.get("Jam Tutup") or clean_row.get("close_time", "22:00"),
+                        "vercel_toggle": main_status_raw in ["on", "open", "true", "ya", "1"],
+                        "shopee_toggle_last": actual_status_raw in ["on", "open", "busy", "true", "ya", "1"],
+                        "suspension_status": susp_raw in ["ya", "yes", "true", "1"],
+                        "suspension_reason": clean_row.get("Alasan") or clean_row.get("Alasan Penangguhan", ""),
+                        "suspension_start": clean_row.get("Tanggal Mulai Penangguhan", ""),
+                        "suspension_end": clean_row.get("Tanggal Berakhir Penangguhan", ""),
+                        "subscription_package": clean_row.get("Paket") or clean_row.get("Paket Subscription", "3 Bulan"),
+                        "subscription_start": sub_start,
+                        "subscription_end": sub_end,
+                        "subscription_status": subscription_status,
                     }
-                    if d["store_id"]:
-                        outlets.append(OutletData.from_dict(d))
-                log.info(f"Successfully loaded {len(outlets)} outlets from Google Sheets.")
-                return outlets
+                    outlets.append(OutletData.from_dict(d))
+
+                if outlets:
+                    log.info(f"Successfully loaded {len(outlets)} outlets from Google Sheets CSV.")
+                    return outlets
+                else:
+                    log.warning("No valid outlets parsed from Google Sheets CSV. Falling back to local cache.")
+                    return self.local_cache_provider.fetch_all_outlets()
             else:
-                log.warning(f"Google Sheets URL returned non-CSV response (Status {resp.status_code}). Falling back to local cache.")
+                log.warning(f"Google Sheets URL returned status {resp.status_code}. Falling back to local cache.")
                 return self.local_cache_provider.fetch_all_outlets()
         except Exception as e:
             log.error(f"Error accessing Google Sheets ({e}). Falling back to local cache provider.")
@@ -323,6 +393,9 @@ class GoogleSheetsDataProvider(BaseDataProvider):
 
     def update_vercel_toggle(self, store_id: str, new_toggle: bool) -> bool:
         return self.local_cache_provider.update_vercel_toggle(store_id, new_toggle)
+
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        return self.local_cache_provider.update_outlet(store_id, updates)
 
 
 class VercelApiDataProvider(BaseDataProvider):
@@ -377,6 +450,9 @@ class VercelApiDataProvider(BaseDataProvider):
             log.error(f"Failed to update Vercel toggle via Vercel API: {e}")
             return self.local_cache_provider.update_vercel_toggle(store_id, new_toggle)
 
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        return self.local_cache_provider.update_outlet(store_id, updates)
+
 
 class DatabaseDataProvider(BaseDataProvider):
     """Data Provider reading and writing directly to the SQLite Backup database."""
@@ -406,6 +482,21 @@ class DatabaseDataProvider(BaseDataProvider):
                 self.db.save_outlets_backup([outlet.to_dict()])
                 return True
         return False
+
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        outlets = self.fetch_all_outlets()
+        updated = False
+        dict_list = []
+        for outlet in outlets:
+            d = outlet.to_dict()
+            if str(d.get("store_id")) == str(store_id):
+                d.update(updates)
+                d["last_checked_at"] = datetime.now().isoformat()
+                updated = True
+            dict_list.append(d)
+        if updated:
+            self.db.save_outlets_backup(dict_list)
+        return updated
 
 
 class HybridDataProvider(BaseDataProvider):
@@ -446,6 +537,11 @@ class HybridDataProvider(BaseDataProvider):
         res_db = self.db_provider.update_vercel_toggle(store_id, new_toggle)
         return res_primary or res_db
 
+    def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        res_primary = self.primary.update_outlet(store_id, updates)
+        res_db = self.db_provider.update_outlet(store_id, updates)
+        return res_primary or res_db
+
 
 class DataProviderFactory:
     """Factory to instantiate the appropriate DataProvider based on configuration."""
@@ -453,13 +549,14 @@ class DataProviderFactory:
     @staticmethod
     def create_provider() -> BaseDataProvider:
         provider_type = os.environ.get("DATA_PROVIDER_TYPE", "hybrid").strip().lower()
-        sheet_id = os.environ.get("GOOGLE_SHEET_ID", "10osh4rI4q_mv6fBe9NurXRztRrGa85L01Bwned6m0Qs")
+        csv_url = os.environ.get("GOOGLE_SHEETS_CSV_URL", "https://docs.google.com/spreadsheets/d/e/2PACX-1vSTEPFClRQogVXYHNo3PRN4m91wHoKHSpS6Dg5Ofj08JFZdoCS9apvvh3C2OTVpqpebFk6xhaQs6ljY/pub?output=csv")
+        sheet_id = os.environ.get("GOOGLE_SHEET_ID", "")
         vercel_url = os.environ.get("VERCEL_API_URL", "")
 
         db_manager = DatabaseManager()
 
         if provider_type == "sheets":
-            primary = GoogleSheetsDataProvider(sheet_id=sheet_id)
+            primary = GoogleSheetsDataProvider(sheet_id=sheet_id, csv_url=csv_url)
         elif provider_type == "vercel" and vercel_url:
             primary = VercelApiDataProvider(api_url=vercel_url)
         elif provider_type == "database":
@@ -467,6 +564,6 @@ class DataProviderFactory:
         elif provider_type == "local_json":
             return LocalJsonDataProvider()
         else:  # Default to 'hybrid' with Google Sheets primary + SQLite DB backup
-            primary = GoogleSheetsDataProvider(sheet_id=sheet_id)
+            primary = GoogleSheetsDataProvider(sheet_id=sheet_id, csv_url=csv_url)
 
         return HybridDataProvider(primary_provider=primary, db_manager=db_manager)

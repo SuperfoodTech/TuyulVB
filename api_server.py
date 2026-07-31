@@ -165,6 +165,25 @@ async def post_toggle(payload: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/outlets/update", dependencies=[Depends(verify_api_key)])
+async def update_outlet_endpoint(payload: Dict[str, Any]):
+    store_id = str(payload.get("store_id", ""))
+    if not store_id:
+        raise HTTPException(status_code=400, detail="Missing 'store_id' parameter")
+
+    try:
+        provider = DataProviderFactory.create_provider()
+        success = provider.update_outlet(store_id, payload)
+        return {
+            "status": "success" if success else "not_found",
+            "store_id": store_id,
+            "message": "Outlet details updated successfully" if success else "Outlet store_id not found"
+        }
+    except Exception as e:
+        log.error(f"Error processing /api/outlets/update: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/trigger-sync", dependencies=[Depends(verify_api_key)])
 async def trigger_sync(payload: Dict[str, Any] = None):
     try:
