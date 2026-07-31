@@ -41,18 +41,20 @@ export function getWeeklySchedule(outlet) {
 
   return [1, 2, 3, 4, 5, 6, 7].map((dayId) => {
     const isToday = dayId === todayId;
-    const isOperating = activeDays.includes(dayId);
     const dayName = DAY_NAMES_FULL[dayId - 1];
 
+    let isOperating = activeDays.includes(dayId);
     let openTime = outlet.open_time || "08:00";
     let closeTime = outlet.close_time || "22:00";
     let note = "Normal";
 
-    // Custom daily schedule rules or customSchedule JSON
     if (customSchedule[dayId]) {
-      openTime = customSchedule[dayId].open || openTime;
-      closeTime = customSchedule[dayId].close || closeTime;
-      note = customSchedule[dayId].note || note;
+      if (customSchedule[dayId].isOperating !== undefined) {
+        isOperating = customSchedule[dayId].isOperating;
+      }
+      openTime = customSchedule[dayId].openTime || customSchedule[dayId].open || openTime;
+      closeTime = customSchedule[dayId].closeTime || customSchedule[dayId].close || closeTime;
+      note = customSchedule[dayId].note !== undefined ? customSchedule[dayId].note : note;
     } else if (dayId === 5) {
       // Jumat: Buka Siang / Sholat Jumat
       openTime = outlet.friday_open_time || openTime;
@@ -71,6 +73,8 @@ export function getWeeklySchedule(outlet) {
       shortName: DAY_NAMES_SHORT[dayId - 1],
       isToday,
       isOperating,
+      openTime,
+      closeTime,
       hours: isOperating ? `${openTime} – ${closeTime}` : "Libur (Tutup)",
       note: isOperating ? note : "Libur",
     };

@@ -381,6 +381,10 @@ export default function AdminDashboard({ outlets, onUpdateOutlet, onRefresh, loa
         <ScheduleModal
           outlet={viewScheduleOutlet}
           onClose={() => setViewScheduleOutlet(null)}
+          onUpdateOutlet={(updated) => {
+            if (onUpdateOutlet) onUpdateOutlet(updated);
+            setViewScheduleOutlet(updated);
+          }}
         />
       )}
     </div>

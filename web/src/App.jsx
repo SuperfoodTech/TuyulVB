@@ -82,15 +82,39 @@ export default function App() {
         setApiConnected(false);
         const fallbackList = [
           {
-            store_id: "ST1001",
-            merchant_id: "M101",
-            owner_name: "Merchant Foodnesia",
-            portal_name: "Foodnesia Portal",
-            outlet_long_name: "Foodnesia Outlet Utama",
-            outlet_short_name: "Foodnesia Center",
-            merchant_username: "foodnesia",
-            merchant_password: "foodnesia123",
-            access_token: "mcht_live_m101_8f9a2b",
+            store_id: "21708900",
+            merchant_id: "11511947",
+            owner_name: "Fando",
+            portal_name: "SuperFood",
+            outlet_long_name: "Ayam Lengkuas, Ayam Warisan by Foodnesia",
+            outlet_short_name: "Ayam Lengkuas F",
+            merchant_username: "superfoodapp",
+            merchant_password: "Master@00@",
+            access_token: "mcht_live_11511947_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "09:00",
+            close_time: "20:00",
+            friday_open_time: "09:00",
+            friday_close_time: "20:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "21897117",
+            merchant_id: "14367488",
+            owner_name: "Fando",
+            portal_name: "WonderFood",
+            outlet_long_name: "Ayam Goreng Lengkuas, Ayam Warisan by WonderFood",
+            outlet_short_name: "Ayam Goreng Lengkuas W",
+            merchant_username: "wonderfoodapp",
+            merchant_password: "Master@00@",
+            access_token: "mcht_live_14367488_8f9a2b",
             operating_days: "1,2,3,4,5,6,7",
             open_time: "08:00",
             close_time: "22:00",
@@ -98,80 +122,260 @@ export default function App() {
             shopee_toggle_last: true,
             suspension_status: false,
             suspension_reason: "",
-            subscription_package: "6 Bulan",
-            subscription_start: "2026-01-01",
-            subscription_end: "2026-12-31",
-            subscription_status: "Active",
-            last_checked_at: new Date().toISOString()
-          },
-          {
-            store_id: "ST1004",
-            merchant_id: "M101", // Toko ke-2 milik Merchant M101
-            owner_name: "Merchant Foodnesia",
-            portal_name: "Foodnesia Portal",
-            outlet_long_name: "Foodnesia Cabang Barat",
-            outlet_short_name: "Foodnesia Barat",
-            merchant_username: "foodnesia",
-            merchant_password: "foodnesia123",
-            access_token: "mcht_live_m101_8f9a2b",
-            operating_days: "1,2,3,4,5,6,7",
-            open_time: "09:00",
-            close_time: "23:00",
-            vercel_toggle: true,
-            shopee_toggle_last: true,
-            suspension_status: false,
-            suspension_reason: "",
-            subscription_package: "6 Bulan",
-            subscription_start: "2026-01-01",
-            subscription_end: "2026-12-31",
-            subscription_status: "Active",
-            last_checked_at: new Date().toISOString()
-          },
-          {
-            store_id: "ST1002",
-            merchant_id: "M102",
-            owner_name: "Merchant WonderFood",
-            portal_name: "WonderFood Portal",
-            outlet_long_name: "WonderFood Cabang Selatan",
-            outlet_short_name: "WonderFood",
-            merchant_username: "wonderfood",
-            merchant_password: "wonderfood123",
-            access_token: "mcht_live_m102_8f9a2b",
-            operating_days: "1,2,3,4,5",
-            open_time: "09:00",
-            close_time: "21:00",
-            vercel_toggle: false,
-            shopee_toggle_last: false,
-            suspension_status: false,
-            suspension_reason: "",
             subscription_package: "3 Bulan",
-            subscription_start: "2026-01-01",
-            subscription_end: "2026-04-01", // Expired
-            subscription_status: "Expired",
-            last_checked_at: new Date().toISOString()
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
           },
           {
-            store_id: "ST1003",
-            merchant_id: "M103",
-            owner_name: "Merchant Lokarasa",
-            portal_name: "Lokarasa Portal",
-            outlet_long_name: "Lokarasa Restoran Pusat",
-            outlet_short_name: "Lokarasa",
-            merchant_username: "lokarasa",
-            merchant_password: "lokarasa123",
-            access_token: "mcht_live_m103_8f9a2b",
+            store_id: "21901580",
+            merchant_id: "14384953",
+            owner_name: "Fando",
+            portal_name: "LOKARASA",
+            outlet_long_name: "Ayam Laos Lengkuas Citraland",
+            outlet_short_name: "Ayam Laos Citra D",
+            merchant_username: "lokarasaapp",
+            merchant_password: "Master@00@",
+            access_token: "mcht_live_14384953_8f9a2b",
             operating_days: "1,2,3,4,5,6,7",
-            open_time: "10:00",
+            open_time: "08:00",
             close_time: "22:00",
             vercel_toggle: true,
             shopee_toggle_last: true,
             suspension_status: false,
             suspension_reason: "",
-            subscription_package: "6 Bulan",
-            subscription_start: "2026-03-01",
-            subscription_end: "2026-09-01",
-            subscription_status: "Active",
-            last_checked_at: new Date().toISOString()
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22300081",
+            merchant_id: "15892383",
+            owner_name: "Fando",
+            portal_name: "Do Eat, Gurame Bakar",
+            outlet_long_name: "Ayam Laos Lengkuas Citraland",
+            outlet_short_name: "Ayam Laos Citra D",
+            merchant_username: "doeatapp",
+            merchant_password: "Master@00@",
+            access_token: "mcht_live_15892383_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22299060",
+            merchant_id: "15892383",
+            owner_name: "Fando",
+            portal_name: "Do Eat, Gurame Bakar",
+            outlet_long_name: "Tahu Mbledos Pandanlandung",
+            outlet_short_name: "Tahu Mbledos D",
+            merchant_username: "doeatapp",
+            merchant_password: "Master@00@",
+            access_token: "mcht_live_15892383_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: false,
+            shopee_toggle_last: false,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-04-01",
+            subscription_end: "2026-06-30",
+            subscription_status: "Expired"
+          },
+          {
+            store_id: "21830870",
+            merchant_id: "11511947",
+            owner_name: "Yolo",
+            portal_name: "SuperFood",
+            outlet_long_name: "Warung Nasi Rawon, Foodnesia",
+            outlet_short_name: "Warung NasiRawonFoodnesia",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_11511947_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: false,
+            shopee_toggle_last: false,
+            suspension_status: true,
+            suspension_reason: "Menunggak tagihan 3x",
+            suspension_start: "2026-08-02",
+            suspension_end: "2026-12-31",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "21897166",
+            merchant_id: "14367488",
+            owner_name: "Yolo",
+            portal_name: "WonderFood",
+            outlet_long_name: "Warung Lontong Sayur, WonderFood",
+            outlet_short_name: "Wrg Ltg Syr Bu Sdarwati W",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_14367488_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: false,
+            shopee_toggle_last: false,
+            suspension_status: true,
+            suspension_reason: "Menunggak tagihan 3x",
+            suspension_start: "2026-08-02",
+            suspension_end: "2026-12-31",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "21901629",
+            merchant_id: "14384953",
+            owner_name: "Yolo",
+            portal_name: "LOKARASA",
+            outlet_long_name: "Rawon dan Lontong Sayur, Lokarasa",
+            outlet_short_name: "Wr Lontong Sudarwati L",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_14384953_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: false,
+            shopee_toggle_last: false,
+            suspension_status: true,
+            suspension_reason: "Menunggak tagihan 3x",
+            suspension_start: "2026-08-02",
+            suspension_end: "2026-12-31",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22299059",
+            merchant_id: "15892383",
+            owner_name: "Yolo",
+            portal_name: "Do Eat, Gurame Bakar",
+            outlet_long_name: "Nasi Rawon Kebonsari",
+            outlet_short_name: "Nasi Rawon D",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_15892383_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: false,
+            shopee_toggle_last: false,
+            suspension_status: true,
+            suspension_reason: "Menunggak tagihan 3x",
+            suspension_start: "2026-08-02",
+            suspension_end: "2026-12-31",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22403554",
+            merchant_id: "11511947",
+            owner_name: "Yolo",
+            portal_name: "SuperFood",
+            outlet_long_name: "Sate Ayam Special 1, Foodnesia",
+            outlet_short_name: "Sate Ayam Pucang F",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_11511947_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22403325",
+            merchant_id: "14367488",
+            owner_name: "Yolo",
+            portal_name: "WonderFood",
+            outlet_long_name: "Sate Ayam 1, WonderFood",
+            outlet_short_name: "Sate Ayam Kumis W",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_14367488_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22403231",
+            merchant_id: "14384953",
+            owner_name: "Yolo",
+            portal_name: "LOKARASA",
+            outlet_long_name: "Sate Ayam Mantap 1, Lokarasa",
+            outlet_short_name: "Sate Ayam Kumis L",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_14384953_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
+          },
+          {
+            store_id: "22403454",
+            merchant_id: "15892383",
+            owner_name: "Yolo",
+            portal_name: "Do Eat, Gurame Bakar",
+            outlet_long_name: "Sate Ayam Pucang",
+            outlet_short_name: "Sate Ayam Pucang D",
+            merchant_username: "auto7313",
+            merchant_password: "Auto@7313",
+            access_token: "mcht_live_15892383_8f9a2b",
+            operating_days: "1,2,3,4,5,6,7",
+            open_time: "08:00",
+            close_time: "22:00",
+            vercel_toggle: true,
+            shopee_toggle_last: true,
+            suspension_status: false,
+            suspension_reason: "",
+            subscription_package: "3 Bulan",
+            subscription_start: "2026-08-01",
+            subscription_end: "2026-11-01",
+            subscription_status: "Active"
           }
         ];
         setOutlets(fallbackList);
@@ -180,32 +384,36 @@ export default function App() {
       .finally(() => setLoading(false));
   };
 
-  // Evaluasi link token khusus merchant (berbasis Merchant ID)
+  // Evaluasi link token khusus merchant (berbasis Kode Unik Akses / Token)
   const evaluateUrlToken = (allOutlets) => {
     if (!tokenParam) return;
 
     const q = tokenParam.toLowerCase().trim();
 
-    // Match all stores belonging to this Merchant ID or Token
-    const matchedStores = allOutlets.filter((o) => {
-      const mId = o.merchant_id.toLowerCase();
+    // Match exact store by access_token, merchant_id, or store_id
+    const matchedTokenStore = allOutlets.find((o) => {
       const token = (o.access_token || "").toLowerCase();
-      const storeId = o.store_id.toLowerCase();
-      return mId === q || token === q || storeId === q || (q.includes("m") && mId.includes(q));
+      const mId = (o.merchant_id || "").toLowerCase();
+      const storeId = (o.store_id || "").toLowerCase();
+      return token === q || mId === q || storeId === q;
     });
 
-    if (matchedStores.length === 0) {
+    if (!matchedTokenStore) {
       setTargetOutlet({
         store_id: tokenParam,
         portal_name: "Unknown Merchant",
-        reason: "Access Token / Merchant ID link tidak valid atau telah dicabut oleh Admin."
+        reason: "Kode Akses Unik / Link Token Merchant tidak valid atau telah dicabut oleh Admin."
       });
       setIsExpired(true);
       return;
     }
 
-    const firstStore = matchedStores[0];
-    setTargetOutlet(firstStore);
+    const targetMerchantId = matchedTokenStore.merchant_id;
+    const matchedStores = allOutlets.filter(
+      (o) => o.merchant_id === targetMerchantId || (o.access_token && o.access_token.toLowerCase() === q)
+    );
+
+    setTargetOutlet(matchedTokenStore);
     setTargetMerchantOutlets(matchedStores);
 
     // Check if ALL stores under this merchant are expired
@@ -219,6 +427,10 @@ export default function App() {
 
   useEffect(() => {
     fetchOutlets();
+    const interval = setInterval(() => {
+      fetchOutlets();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [tokenParam]);
 
   // Filtered outlets untuk Merchant View — Tampilkan SEMUA outlet milik Merchant ID ini!
@@ -257,6 +469,13 @@ export default function App() {
     setOutlets((prev) =>
       prev.map((o) => (o.store_id === updatedOutlet.store_id ? { ...o, ...updatedOutlet } : o))
     );
+    fetch(`${API_BASE_URL}/api/outlets/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SECRET_KEY },
+      body: JSON.stringify(updatedOutlet)
+    })
+      .then((res) => res.json())
+      .catch((err) => console.error("Error updating outlet:", err));
   };
 
   const handleMerchantLoginSuccess = (user) => {
@@ -352,6 +571,7 @@ export default function App() {
             onRefresh={fetchOutlets}
             loading={loading}
             currentUser={currentUser}
+            onUpdateOutlet={handleUpdateOutletAdmin}
           />
         )}
 
@@ -365,6 +585,7 @@ export default function App() {
                 onRefresh={fetchOutlets}
                 loading={loading}
                 currentUser={currentUser}
+                onUpdateOutlet={handleUpdateOutletAdmin}
               />
             </div>
             <div className={activeTab === "links" ? "" : "hidden"}>
