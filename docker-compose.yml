@@ -1,20 +1,20 @@
 services:
-  tuyulvb-bot:
+  auto-oc-bot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tuyulvb-backend-bot
+    container_name: auto-oc-backend-bot
     restart: unless-stopped
     env_file:
       - .env
     ports:
-      - "18800:18800"
+      - "8000:8000"
     environment:
       - TZ=Asia/Jakarta
       - HEADLESS_MODE=True
       - DATA_PROVIDER_TYPE=hybrid
-      - DATABASE_PATH=data/db/tuyul_vb.db
-      - API_PORT=18800
+      - DATABASE_PATH=data/db/auto_oc.db
+      - API_PORT=8000
       - API_SECRET_KEY=foodmaster-secret-api-key-2026
     volumes:
       # Persistent isolated Chromium browser profile & session login
