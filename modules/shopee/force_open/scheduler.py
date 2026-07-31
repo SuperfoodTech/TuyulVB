@@ -32,7 +32,7 @@ log = get_logger("force_open_scheduler")
 log.propagate = False
 
 config = load_config()
-INTERVAL_MINUTES = config.get("INTERVAL_MINUTES", 15)
+INTERVAL_SECONDS = int(os.environ.get("BOT_INTERVAL_SECONDS", os.environ.get("INTERVAL_SECONDS", config.get("INTERVAL_SECONDS", 60))))
 DRY_RUN = config.get("DRY_RUN", False)
 HEADLESS_MODE = config.get("HEADLESS_MODE", True)
 
@@ -46,15 +46,19 @@ class ForceOpenScheduler:
         self.db_manager = DatabaseManager()
         self.run_count = 0
         self.is_running = False
+        self._token_refresh_fail_count = 0
 
         log.info(
             f"Scheduler initialized with Data Provider. "
-            f"Interval: {INTERVAL_MINUTES}m. "
+            f"Interval: {INTERVAL_SECONDS}s. "
             f"DRY_RUN: {DRY_RUN}. HEADLESS: {HEADLESS_MODE}"
         )
 
-    def initialize_session(self):
-        """Initializes browser session once and reuses it."""
+    def initialize_session(self) -> bool:
+        """Initializes browser session once, reuses it, and ensures Shopee login.
+        Uses saved chromeprofile cookies — no OTP triggered for restored sessions.
+        If session expires, auto-reconnects and re-validates via chromeprofile.
+        """
         if self.session is None or self.session.driver is None:
             log.info("Initializing browser session...")
             try:
@@ -63,10 +67,36 @@ class ForceOpenScheduler:
                     log.error("Failed to initialize browser session.")
                     return False
                 log.info("Browser session initialized successfully.")
-                return True
             except Exception as e:
                 log.error(f"Error initializing browser session: {e}")
                 return False
+
+        # Validate / restore Shopee login using saved chromeprofile (no OTP triggered)
+        try:
+            logged_in = self.session.ensure_logged_in(max_retries=2)
+            if logged_in:
+                log.info("✅ Shopee Partner session validated (chromeprofile auto-login).")
+                self._token_refresh_fail_count = 0
+                # Eagerly cache the fresh token for API calls
+                from modules.shopee.api_utils import get_auth_tokens
+                import json, os
+                tob_token, entity_id = get_auth_tokens(driver=self.session.driver)
+                if tob_token:
+                    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "cache")
+                    os.makedirs(cache_dir, exist_ok=True)
+                    cache_path = os.path.join(cache_dir, "shopee_auth_tokens.json")
+                    with open(cache_path, "w") as f:
+                        json.dump({"shopee_tob_token": tob_token, "shopee_tob_entity_id": entity_id, "updated_at": datetime.now().isoformat()}, f)
+                    log.info(f"✅ Shopee API token refreshed and cached (entity: {entity_id or 'n/a'}).")
+                else:
+                    log.warning("Session valid but tob_token not extracted — bot will use last cached token.")
+            else:
+                self._token_refresh_fail_count += 1
+                log.warning(f"⚠️ Shopee login validation failed (attempt #{self._token_refresh_fail_count}). "
+                            f"Bot will operate in data-only mode until session is restored.")
+        except Exception as e:
+            log.warning(f"Session health check skipped: {e}")
+
         return True
 
     def run_scheduled_job(self):
@@ -80,7 +110,7 @@ class ForceOpenScheduler:
         log.info(f"\n{'='*80}\nStarting Scheduled Job Execution #{self.run_count} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n{'='*80}")
 
         try:
-            # Ensure browser session is active
+            # Ensure browser session is active and Shopee login is valid
             if not self.initialize_session():
                 log.warning("Running job without active browser session (API mode / status check only).")
 
@@ -98,18 +128,19 @@ class ForceOpenScheduler:
         finally:
             self.is_running = False
 
+
     def start(self):
         """Starts the scheduler loop."""
-        log.info("Starting scheduler loop...")
+        log.info("Starting real-time scheduler loop...")
         self.run_scheduled_job()  # Run immediately once on start
 
-        schedule.every(INTERVAL_MINUTES).minutes.do(self.run_scheduled_job)
-        log.info(f"Job scheduled to run every {INTERVAL_MINUTES} minutes. Press Ctrl+C to exit.")
+        schedule.every(INTERVAL_SECONDS).seconds.do(self.run_scheduled_job)
+        log.info(f"Job scheduled to run every {INTERVAL_SECONDS} seconds (Real-Time Mode). Press Ctrl+C to exit.")
 
         while True:
             try:
                 schedule.run_pending()
-                time.sleep(10)
+                time.sleep(5)
             except KeyboardInterrupt:
                 log.info("Scheduler stopped by user.")
                 break
