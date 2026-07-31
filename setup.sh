@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Superfood Automation Suite (TuyulVB) - High-Speed Installer using UV
+# Superfood Automation Suite (Auto-OC) - High-Speed Installer using UV
 # ==============================================================================
 
 set -e
