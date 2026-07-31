@@ -3,11 +3,11 @@ import { getWeeklySchedule, formatOperatingDays } from "../utils/outletUtils";
 export default function ScheduleModal({ outlet, onClose }) {
   if (!outlet) return null;
 
-  const schedule = getWeeklySchedule(outlet);
+  const scheduleList = getWeeklySchedule(outlet);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="animate-scale-up w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 p-6 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="animate-scale-up w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 p-6 shadow-2xl space-y-5 my-8">
 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 dark:border-zinc-800/80 pb-4">
@@ -23,9 +23,13 @@ export default function ScheduleModal({ outlet, onClose }) {
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-              {outlet.outlet_long_name || outlet.outlet_short_name} &bull; {formatOperatingDays(outlet.operating_days)}
+              {outlet.outlet_long_name || outlet.outlet_short_name} &bull;{" "}
+              <span className="font-bold text-red-600 dark:text-red-400">
+                {formatOperatingDays(outlet.operating_days)}
+              </span>
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -37,35 +41,50 @@ export default function ScheduleModal({ outlet, onClose }) {
           </button>
         </div>
 
+        {/* Info Banner */}
+        <div className="rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-3 text-xs text-slate-600 dark:text-zinc-400 flex items-center gap-2">
+          <svg className="h-4 w-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            Jadwal operasional berikut ditarik otomatis langsung dari sistem <strong>ShopeePartner</strong> / Google Sheets.
+          </span>
+        </div>
+
         {/* 7-Day Schedule Table */}
         <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 dark:bg-zinc-950/60 text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-100 dark:border-zinc-800">
               <tr>
-                <th className="px-4 py-3">Hari</th>
+                <th className="px-4 py-3 w-32">Hari</th>
                 <th className="px-4 py-3">Jam Operasional</th>
                 <th className="px-4 py-3 text-right">Keterangan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 text-slate-700 dark:text-zinc-300">
-              {schedule.map((item) => (
+              {scheduleList.map((item) => (
                 <tr
                   key={item.dayId}
                   className={`transition-colors ${
                     item.isToday
-                      ? "bg-red-50/60 dark:bg-red-950/20 font-bold"
+                      ? "bg-red-50/60 dark:bg-red-950/20 font-semibold"
                       : "hover:bg-slate-50/50 dark:hover:bg-zinc-800/30"
                   }`}
                 >
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <span className="w-16 font-semibold">{item.name}</span>
-                    {item.isToday && (
-                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
-                        Hari Ini
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {item.name}
                       </span>
-                    )}
+                      {item.isToday && (
+                        <span className="rounded-full bg-red-600 px-2 py-0.5 text-[9.5px] font-bold text-white uppercase tracking-wider">
+                          Hari Ini
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-4 py-3 font-mono">
+
+                  <td className="px-4 py-3.5 font-mono">
                     {item.isOperating ? (
                       <span className="text-slate-900 dark:text-white font-semibold">
                         {item.hours}
@@ -76,8 +95,11 @@ export default function ScheduleModal({ outlet, onClose }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-400 dark:text-zinc-500 text-[11px]">
-                    {item.note}
+
+                  <td className="px-4 py-3.5 text-right">
+                    <span className="text-slate-400 dark:text-zinc-500 text-[11px]">
+                      {item.note}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -90,7 +112,7 @@ export default function ScheduleModal({ outlet, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold px-5 py-2.5 text-xs hover:bg-slate-800 dark:hover:bg-zinc-200 transition-all text-center"
+            className="w-full sm:w-auto rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-bold px-6 py-2.5 text-xs hover:bg-slate-800 dark:hover:bg-zinc-200 transition-all text-center"
           >
             Tutup
           </button>

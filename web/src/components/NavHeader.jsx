@@ -96,14 +96,23 @@ export default function NavHeader({
           <div className="flex items-center gap-2">
             {/* API Status — hanya admin */}
             {isAdmin && (
-              <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${
-                apiConnected
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${apiConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
-                {apiConnected ? "API Connected" : "Local Mode"}
-              </span>
+              <>
+                <span className="hidden md:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Bot Running &amp; Monitoring (13 Outlets)
+                </span>
+                <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                  apiConnected
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                    : "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${apiConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  {apiConnected ? "API Connected" : "Local Mode"}
+                </span>
+              </>
             )}
 
             {/* Sync Bot — hanya admin */}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { formatOperatingDays, formatDateID, getSubscriptionInfo, getTodayOperatingHours } from "../utils/outletUtils";
 import ScheduleModal from "./ScheduleModal";
 
-export default function MerchantDashboard({ outlets, onToggleVercel, onRefresh, loading, currentUser }) {
+export default function MerchantDashboard({ outlets, onToggleVercel, onRefresh, loading, currentUser, onUpdateOutlet }) {
   // Modal state untuk "Atur Durasi Tutup Sementara"
   const [closingOutlet, setClosingOutlet] = useState(null);
   const [selectedDuration, setSelectedDuration] = useState("30m");
@@ -308,6 +308,10 @@ export default function MerchantDashboard({ outlets, onToggleVercel, onRefresh, 
         <ScheduleModal
           outlet={viewScheduleOutlet}
           onClose={() => setViewScheduleOutlet(null)}
+          onUpdateOutlet={(updated) => {
+            if (onUpdateOutlet) onUpdateOutlet(updated);
+            setViewScheduleOutlet(updated);
+          }}
         />
       )}
     </div>

@@ -10,9 +10,9 @@ export default function LinkGeneratorTab({ outlets, onUpdateOutlet, onRefresh, l
 
   const getMerchantTokenLink = (outlet) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const mId = outlet.merchant_id.toLowerCase();
+    const mId = (outlet.merchant_id || "mcht").toLowerCase();
     const token = outlet.access_token || `mcht_live_${mId}_8f9a2b`;
-    return `${origin}/?merchant=${outlet.merchant_id}`;
+    return `${origin}/?token=${token}`;
   };
 
   const handleCopyLink = (outlet) => {

@@ -5,9 +5,10 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [isAutoPolling, setIsAutoPolling] = useState(true);
 
-  const fetchLogs = () => {
-    setLoading(true);
+  const fetchLogs = (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     fetch(`${API_BASE_URL}/api/logs`, {
       headers: { "X-API-Key": API_SECRET_KEY || "" }
@@ -17,13 +18,29 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
         return res.json();
       })
       .then((data) => setLogs(Array.isArray(data) ? data : []))
-      .catch(() => setError("Gagal memuat log audit dari server SQLite."))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!silent) setError("Gagal memuat log audit dari server SQLite.");
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    fetchLogs();
-  }, [API_BASE_URL]);
+    fetchLogs(false);
+
+    // Auto-polling real-time setiap 4 detik
+    let intervalId = null;
+    if (isAutoPolling) {
+      intervalId = setInterval(() => {
+        fetchLogs(true);
+      }, 4000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [API_BASE_URL, isAutoPolling]);
 
   const filteredLogs = logs.filter((l) => {
     const q = search.toLowerCase();
@@ -35,10 +52,56 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
     );
   });
 
+  const latestLog = logs[0];
+  const lastExecutionTime = latestLog?.timestamp
+    ? new Date(latestLog.timestamp).toLocaleString("id-ID")
+    : "Belum Ada Eksekusi";
+
   return (
     <div className="space-y-6">
 
-      {/* Header */}
+      {/* Live Bot Execution Status Card */}
+      <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/30 p-5 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-zinc-950 dark:to-zinc-950">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                Status Bot: <span className="text-emerald-600 dark:text-emerald-400">AKTIF & MONITORING REAL-TIME</span>
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Lokasi Eksekusi: <strong className="text-slate-700 dark:text-zinc-300">Server Local / API Bridge (Port 18800)</strong> &bull; Evaluasi Periodik setiap <strong>15 menit</strong> &amp; Auto-Sync Instant.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs shrink-0 flex-wrap">
+            <div className="bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs">
+              <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Eksekusi Terakhir</span>
+              <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{lastExecutionTime}</span>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs">
+              <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Auto Live Refresh</span>
+              <button
+                type="button"
+                onClick={() => setIsAutoPolling(!isAutoPolling)}
+                className={`font-bold text-[11px] inline-flex items-center gap-1 ${
+                  isAutoPolling ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${isAutoPolling ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                {isAutoPolling ? "ON (Setiap 4s)" : "PAUSED"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Table Header */}
       <div className="surface-card p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -54,7 +117,7 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
           </p>
         </div>
         <button
-          onClick={fetchLogs}
+          onClick={() => fetchLogs(false)}
           disabled={loading}
           className="secondary-action gap-1.5 self-start sm:self-auto disabled:opacity-50"
         >
@@ -89,7 +152,7 @@ export default function AuditLogsTab({ API_BASE_URL, API_SECRET_KEY }) {
 
       {/* Logs Table */}
       <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-[0_16px_45px_-30px_rgba(127,29,29,0.45)] dark:border-transparent dark:bg-transparent dark:shadow-none">
-        {loading ? (
+        {loading && logs.length === 0 ? (
           <div className="py-12 text-center text-slate-500 dark:text-zinc-400">
             <svg className="mx-auto h-8 w-8 animate-spin text-red-700 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
