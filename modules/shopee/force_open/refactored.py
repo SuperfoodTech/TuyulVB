@@ -124,11 +124,32 @@ def get_store_status_via_api(
                     "display_status": display_status,
                     "display_status_name": status_name,
                     "is_open": is_open,
+                    "operating_hours": target_store.get("operating_hours"),
                 }
             return {"found": False, "error": "Store not found in search"}
         return {"found": False, "error": data.get("msg", "API Error")}
     except Exception as e:
         return {"found": False, "error": str(e)}
+
+
+def fetch_store_operating_hours_from_shopee(store_id: str, tob_token: str, merchant_entity_id: str) -> Dict[str, Any]:
+    """Fetches store operating hours directly from Shopee Partner API."""
+    headers = get_shopee_headers(tob_token, merchant_entity_id)
+    url = f"{SHOPEE_API_BASE}/api/seller/store/operating-hours/get"
+    payload = {"store_id": int(store_id) if store_id.isdigit() else store_id}
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=API_TIMEOUT)
+        data = response.json()
+        if data.get("code") == 0:
+            log.info(f"Successfully fetched operating hours from Shopee Partner for Store ID: {store_id}")
+            return {"success": True, "operating_hours": data.get("data")}
+        else:
+            log.warning(f"Failed to fetch operating hours from Shopee Partner for Store ID {store_id}: {data.get('msg')}")
+            return {"success": False, "error": data.get("msg")}
+    except Exception as e:
+        log.error(f"Error fetching operating hours from Shopee Partner for Store ID {store_id}: {e}")
+        return {"success": False, "error": str(e)}
 
 
 import requests  # Import after standard library imports
@@ -179,7 +200,39 @@ def run_force_open(
     for i, outlet in enumerate(outlets):
         log.info(f"\n[{i+1}/{len(outlets)}] Evaluating Outlet: {outlet.outlet_long_name} (ID: {outlet.store_id})")
 
-        # 3. Evaluate 5-Level System Priority Hierarchy
+        # 3. Pull fresh operating hours from Shopee Partner API before evaluation (if authenticated)
+        if tob_token:
+            try:
+                hours_res = fetch_store_operating_hours_from_shopee(
+                    outlet.store_id, tob_token, merchant_entity_id or outlet.merchant_id
+                )
+                if hours_res.get("success") and hours_res.get("operating_hours"):
+                    oph = hours_res["operating_hours"]
+                    week_hours = oph.get("week_operating_hours", [])
+                    if week_hours:
+                        today_id = datetime.now().isoweekday()  # 1=Monday ... 7=Sunday
+                        today_slot = next((h for h in week_hours if h.get("day") == today_id), None)
+                        if not today_slot and week_hours:
+                            today_slot = week_hours[0]
+
+                        if today_slot and today_slot.get("time_slots"):
+                            slot = today_slot["time_slots"][0]
+                            new_open = slot.get("start_time", outlet.open_time)
+                            new_close = slot.get("end_time", outlet.close_time)
+
+                            if new_open != outlet.open_time or new_close != outlet.close_time:
+                                log.info(f"  -> [SYNC HOURS] Updated fresh operating hours from ShopeePartner: {new_open} - {new_close}")
+                                outlet.open_time = new_open
+                                outlet.close_time = new_close
+                                data_provider.update_outlet(outlet.store_id, {
+                                    "open_time": new_open,
+                                    "close_time": new_close,
+                                    "shopee_operating_hours": oph
+                                })
+            except Exception as ex:
+                log.warning(f"  -> Failed to sync operating hours for {outlet.outlet_short_name}: {ex}")
+
+        # 4. Evaluate 5-Level System Priority Hierarchy
         desired_status, priority_reason = outlet.calculate_desired_shopee_status()
         log.info(f"  -> Priority Decision: Desired Shopee Status = {'OPEN' if desired_status else 'OFF'}")
         log.info(f"  -> Priority Reason: {priority_reason}")
@@ -187,7 +240,7 @@ def run_force_open(
         actual_is_open = None
         shopee_status_name = "Unknown"
 
-        # 4. Check actual status from Shopee if auth token available
+        # 5. Check actual status from Shopee if auth token available
         if tob_token:
             status_res = get_store_status_via_api(
                 outlet.outlet_long_name, tob_token, merchant_entity_id or outlet.merchant_id, outlet.store_id
