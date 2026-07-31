@@ -1,5 +1,5 @@
 """
-Database Manager for TuyulVB Bot
+Database Manager for Auto-OC Bot
 Manages local SQLite database for backup, caching outlet snapshots, and storing structured audit logs.
 """
 

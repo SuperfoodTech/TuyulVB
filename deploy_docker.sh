@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Docker Management Helper Script for TuyulVB Bot
-# Usage: ./deploy_docker.sh [start|stop|restart|logs|status|build]
+# Docker Management Helper Script for Auto-OC Bot
+# Usage: ./deploy_docker.sh [up|down|start|stop|restart|logs|status|build]
 # ==============================================================================
 
 set -e
@@ -9,18 +9,22 @@ set -e
 ACTION="${1:-status}"
 
 case "$ACTION" in
-    start)
-        echo "🚀 Starting TuyulVB Backend Bot Container..."
+    up)
+        echo "🚀 Building and starting Auto-OC containers..."
         docker compose up -d --build
-        echo "✅ Container started successfully! Run './deploy_docker.sh logs' to view output."
+        echo "✅ Containers started successfully!"
         ;;
-    stop)
-        echo "🛑 Stopping TuyulVB Backend Bot Container..."
+    start)
+        echo "🚀 Starting Auto-OC Backend Bot Container..."
+        docker compose start bot
+        ;;
+    stop|down)
+        echo "🛑 Stopping Auto-OC Backend Bot Container..."
         docker compose down
         echo "✅ Container stopped."
         ;;
     restart)
-        echo "🔄 Restarting TuyulVB Backend Bot Container..."
+        echo "🔄 Restarting Auto-OC Backend Bot Container..."
         docker compose restart
         echo "✅ Container restarted."
         ;;

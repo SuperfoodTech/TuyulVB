@@ -1,5 +1,5 @@
 """
-Data Provider Module for TuyulVB
+Data Provider Module for Auto-OC
 Provides unified data access layer for ShopeeFood Outlets, supporting:
 1. Google Sheets Database
 2. Vercel Dashboard API
