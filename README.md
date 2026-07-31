@@ -66,6 +66,7 @@ Auto-OC/
 ├── deploy_docker.sh               # Skrip pembantu manajemen Docker
 ├── docker-compose.yml             # Konfigurasi Docker Compose
 ├── Dockerfile                     # Docker build definition (Headless Chromium)
+├── pyproject.toml                  # Konfigurasi dependensi native uv
 ├── requirements.txt               # Dependensi Python
 ├── 1. run_master.sh / .bat        # Startup script master runner
 ├── 2. run_force_open_scheduler.sh # Startup script force open scheduler
@@ -92,12 +93,19 @@ Auto-OC/
 
 ### 1. Prasyarat System
 - **Python 3.10+**
+- **uv** (Package & Project Manager rekomendasi utama)
 - **Google Chrome** (untuk pengujian lokal) atau **Chromium Headless** (untuk Linux server/Pi)
 - **Node.js 18+** & **npm** (untuk build Web Frontend)
 
-### 2. Instalasi Otomatis (Linux / Raspberry Pi)
-Jalankan skrip installer cepat menggunakan `uv`:
+### 2. Instalasi & Sinkronisasi Dependensi (Ultra-Fast via `uv`)
 
+Cukup jalankan perintah sinkronisasi `uv`:
+
+```bash
+uv sync
+```
+
+*Atau jalankan skrip installer otomatis:*
 ```bash
 chmod +x setup.sh
 ./setup.sh
@@ -126,15 +134,15 @@ DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
 
 ### A. Menjalankan Layanan Terpadu (Backend API + Bot Scheduler)
 
-Cukup jalankan satu perintah:
+Jalankan perintah ini untuk mengaktifkan REST API Server (**Port 8000**) dan Bot Scheduler secara bersamaan:
 
 ```bash
-python api_server.py
+uv run python api_server.py
 ```
 
 *Atau via CLI Runner:*
 ```bash
-python run.py
+uv run python run.py
 # Pilih opsi "Start Unified Auto-OC Backend API & Bot Scheduler (Port 8000)"
 ```
 
