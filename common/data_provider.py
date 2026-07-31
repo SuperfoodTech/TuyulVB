@@ -349,6 +349,38 @@ class GoogleSheetsDataProvider(BaseDataProvider):
                         except ValueError:
                             pass
 
+                    # Parse 7-day operating hours directly from Google Sheet columns (Senin-Minggu)
+                    day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+                    DAY_INDEX_MAP = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"}
+
+                    day_operating_hours = {}
+                    for day_n in day_names:
+                        val = clean_row.get(day_n, "").strip()
+                        if val:
+                            day_operating_hours[day_n] = val
+
+                    today_name = DAY_INDEX_MAP.get(datetime.now().isoweekday(), "Senin")
+                    today_hours = day_operating_hours.get(today_name, "")
+
+                    open_time = "08:00"
+                    close_time = "22:00"
+
+                    if today_hours and "-" in today_hours:
+                        parts = today_hours.split("-", 1)
+                        if parts[0].strip():
+                            open_time = parts[0].strip()
+                        if parts[1].strip():
+                            close_time = parts[1].strip()
+                    elif clean_row.get("Jam Buka") and clean_row.get("Jam Tutup"):
+                        open_time = clean_row.get("Jam Buka", "08:00").strip()
+                        close_time = clean_row.get("Jam Tutup", "22:00").strip()
+
+                    # Fill missing days in day_operating_hours with open_time-close_time
+                    for day_n in day_names:
+                        if day_n not in day_operating_hours or not day_operating_hours[day_n]:
+                            day_operating_hours[day_n] = f"{open_time}-{close_time}"
+
+
                     d = {
                         "store_id": store_id,
                         "merchant_id": clean_row.get("Merchant ID") or clean_row.get("merchant_id", ""),
@@ -360,8 +392,8 @@ class GoogleSheetsDataProvider(BaseDataProvider):
                         "merchant_password": clean_row.get("Akses Kata Sandi") or clean_row.get("merchant_password", ""),
                         "access_token": f"mcht_live_{clean_row.get('Merchant ID', '')}_8f9a2b",
                         "operating_days": clean_row.get("Hari Operasional") or clean_row.get("operating_days", "1,2,3,4,5,6,7"),
-                        "open_time": clean_row.get("Jam Buka") or clean_row.get("open_time", "08:00"),
-                        "close_time": clean_row.get("Jam Tutup") or clean_row.get("close_time", "22:00"),
+                        "open_time": open_time,
+                        "close_time": close_time,
                         "vercel_toggle": main_status_raw in ["on", "open", "true", "ya", "1"],
                         "shopee_toggle_last": actual_status_raw in ["on", "open", "busy", "true", "ya", "1"],
                         "suspension_status": susp_raw in ["ya", "yes", "true", "1"],
@@ -372,6 +404,7 @@ class GoogleSheetsDataProvider(BaseDataProvider):
                         "subscription_start": sub_start,
                         "subscription_end": sub_end,
                         "subscription_status": subscription_status,
+                        "raw_extra": {"day_operating_hours": day_operating_hours}
                     }
                     outlets.append(OutletData.from_dict(d))
 
@@ -388,13 +421,48 @@ class GoogleSheetsDataProvider(BaseDataProvider):
             log.error(f"Error accessing Google Sheets ({e}). Falling back to local cache provider.")
             return self.local_cache_provider.fetch_all_outlets()
 
+    def _fire_webhook(self, payload: Dict[str, Any]) -> None:
+        """POST payload to Google Sheet Webhook in a background thread (fire-and-forget).
+        DNS / network failures do NOT block the main bot loop.
+        """
+        webhook_url = os.getenv("GOOGLE_SHEET_WEBHOOK_URL") or os.getenv("GOOGLE_APPS_SCRIPT_URL")
+        if not webhook_url:
+            return
+        import threading
+
+        def _post():
+            try:
+                requests.post(webhook_url, json=payload, timeout=4)
+            except Exception as e:
+                log.warning(f"[Webhook] POST failed (non-blocking): {type(e).__name__}")
+
+        threading.Thread(target=_post, daemon=True).start()
+
     def update_shopee_status(self, store_id: str, new_status: bool, result_log: str = "") -> bool:
+        self._fire_webhook({
+            "action": "update_shopee_status",
+            "store_id": str(store_id),
+            "shopee_status": new_status,
+            "actual_status_text": "On" if new_status else "Off",
+            "result_log": result_log
+        })
         return self.local_cache_provider.update_shopee_status(store_id, new_status, result_log)
 
     def update_vercel_toggle(self, store_id: str, new_toggle: bool) -> bool:
+        self._fire_webhook({
+            "action": "update_toggle",
+            "store_id": str(store_id),
+            "vercel_toggle": new_toggle,
+            "status_text": "On" if new_toggle else "Off"
+        })
         return self.local_cache_provider.update_vercel_toggle(store_id, new_toggle)
 
     def update_outlet(self, store_id: str, updates: Dict[str, Any]) -> bool:
+        self._fire_webhook({
+            "action": "update_outlet",
+            "store_id": str(store_id),
+            "updates": updates
+        })
         return self.local_cache_provider.update_outlet(store_id, updates)
 
 
@@ -515,7 +583,23 @@ class HybridDataProvider(BaseDataProvider):
         try:
             outlets = self.primary.fetch_all_outlets()
             if outlets:
-                # Save snapshot to database backup
+                # Merge local user toggle and schedule overrides from SQLite database backup
+                db_outlets = self.db_provider.fetch_all_outlets()
+                db_map = {str(o.store_id): o for o in db_outlets}
+
+                for o in outlets:
+                    sid = str(o.store_id)
+                    if sid in db_map:
+                        db_o = db_map[sid]
+                        # Preserve local toggle decision & updated status
+                        o.vercel_toggle = db_o.vercel_toggle
+                        o.shopee_toggle_last = db_o.shopee_toggle_last
+                        if db_o.open_time:
+                            o.open_time = db_o.open_time
+                        if db_o.close_time:
+                            o.close_time = db_o.close_time
+
+                # Save updated snapshot to database backup
                 dict_list = [o.to_dict() for o in outlets]
                 self.db_manager.save_outlets_backup(dict_list)
                 return outlets

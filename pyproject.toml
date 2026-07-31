@@ -1,0 +1,29 @@
+[project]
+name = "auto-oc"
+version = "0.1.0"
+description = "Auto Open & Auto Close ShopeeFood Bot Suite"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "selenium>=4.0.0",
+    "selenium-wire>=5.0.0",
+    "pyOpenSSL<24.0.0",
+    "cryptography<42.0.0",
+    "blinker<1.8.0",
+    "webdriver-manager",
+    "setuptools<70.0.0",
+    "pandas",
+    "openpyxl",
+    "requests",
+    "python-dotenv",
+    "tqdm",
+    "schedule",
+    "aiohttp",
+    "cachetools",
+    "PyJWT",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+]
+
+[tool.uv]
+dev-dependencies = []

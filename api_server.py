@@ -50,14 +50,18 @@ app.add_middleware(
 )
 
 
+GLOBAL_SCHEDULER: Any = None
+
+
 def start_integrated_scheduler():
     """Starts the Auto-OC ForceOpenScheduler in a background daemon thread."""
+    global GLOBAL_SCHEDULER
     try:
         from modules.shopee.force_open.scheduler import ForceOpenScheduler
+        GLOBAL_SCHEDULER = ForceOpenScheduler()
         def _scheduler_thread():
             log.info("🤖 Starting Integrated Auto-OC Bot Scheduler Thread...")
-            scheduler = ForceOpenScheduler()
-            scheduler.start()
+            GLOBAL_SCHEDULER.start()
 
         t = threading.Thread(target=_scheduler_thread, daemon=True, name="AutoOCBotSchedulerThread")
         t.start()
@@ -169,10 +173,11 @@ async def post_toggle(payload: Dict[str, Any]):
     try:
         provider = DataProviderFactory.create_provider()
         success = provider.update_vercel_toggle(store_id, new_toggle)
-        # Safely trigger background cycle
+        session = GLOBAL_SCHEDULER.session if GLOBAL_SCHEDULER else None
+        # Safely trigger background cycle in REAL execution mode
         threading.Thread(
             target=run_force_open,
-            kwargs={"data_provider": provider, "dry_run": True},
+            kwargs={"session": session, "data_provider": provider, "dry_run": False},
             daemon=True
         ).start()
         return {
@@ -209,9 +214,10 @@ async def update_outlet_endpoint(payload: Dict[str, Any]):
 async def trigger_sync(payload: Dict[str, Any] = None):
     try:
         body = payload or {}
-        dry_run = bool(body.get("dry_run", True))
+        dry_run = bool(body.get("dry_run", False))
         provider = DataProviderFactory.create_provider()
-        stats = run_force_open(data_provider=provider, dry_run=dry_run)
+        session = GLOBAL_SCHEDULER.session if GLOBAL_SCHEDULER else None
+        stats = run_force_open(session=session, data_provider=provider, dry_run=dry_run)
         return {
             "status": "completed",
             "timestamp": datetime.now().isoformat(),
