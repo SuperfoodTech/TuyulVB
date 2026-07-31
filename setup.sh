@@ -37,16 +37,14 @@ if ! command -v uv &> /dev/null; then
 fi
 
 # 3. Setup Virtual Environment using UV (or fallback to standard venv)
-VENV_DIR="$SCRIPT_DIR/venv"
+VENV_DIR="$SCRIPT_DIR/.venv"
 if command -v uv &> /dev/null; then
-    echo "⚡ Using 'uv' to manage virtual environment & dependencies..."
-    if [ ! -d "$VENV_DIR" ]; then
-        uv venv "$VENV_DIR"
-    fi
-    echo "📥 Installing Python dependencies with 'uv'..."
-    uv pip install --python "$VENV_DIR/bin/python3" -r requirements.txt
+    echo "⚡ Using 'uv' to sync virtual environment & dependencies..."
+    uv sync
+    echo "✅ Dependencies synced with 'uv'."
 else
     echo "🐍 'uv' unavailable, falling back to standard venv..."
+    VENV_DIR="$SCRIPT_DIR/venv"
     if [ ! -d "$VENV_DIR" ]; then
         python3 -m venv "$VENV_DIR"
     fi
